@@ -1,0 +1,6 @@
+partitura==1.5.0
+torchmetrics==0.5.0
+scipy==1.7.1
+pytorch_lightning==1.4.0
+verovio==0.1.0
+plotly==5.3.1
