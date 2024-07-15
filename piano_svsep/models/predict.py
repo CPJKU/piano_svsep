@@ -4,12 +4,12 @@ import partitura.score as spt
 import numpy as np
 import torch
 from piano_svsep.models.pl_models import PolyphonicVoiceSeparationModel
-from piano_svsep.data import get_measurewise_truth_edges, get_truth_chords_edges
+from piano_svsep.utils import get_measurewise_truth_edges, get_truth_chords_edges
 from piano_svsep.models.VoicePredPoly import assign_voices, infer_vocstaff_algorithm
 from piano_svsep.utils.visualization import save_pyg_graph_as_json
 from piano_svsep.utils import (
     hetero_graph_from_note_array,
-    select_features,
+    get_vocsep_features,
     score_graph_to_pyg,
     HeteroScoreGraph,
     remove_ties_acros_barlines,
@@ -61,7 +61,7 @@ def prepare_score(path_to_score, exclude_grace=True):
     mn_map = score[np.array([p._quarter_durations[0] for p in score]).argmax()].measure_number_map
     note_measures = mn_map(note_array["onset_div"])
     nodes, edges = hetero_graph_from_note_array(note_array, pot_edge_dist=0)
-    note_features = select_features(note_array, "voice")
+    note_features = get_vocsep_features(note_array)
     hg = HeteroScoreGraph(
         note_features,
         edges,

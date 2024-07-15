@@ -2,7 +2,85 @@ import torch
 import numpy as np
 import partitura
 import torch_geometric as pyg
-import partitura.score as spt
+from typing import Tuple, List
+import partitura as pt
+
+
+def get_pc_one_hot(part, note_array):
+    one_hot = np.zeros((len(note_array), 12))
+    idx = (np.arange(len(note_array)),np.remainder(note_array["pitch"], 12))
+    one_hot[idx] = 1
+    return one_hot, ["pc_{:02d}".format(i) for i in range(12)]
+
+
+def get_full_pitch_one_hot(part, note_array, piano_range = True):
+    one_hot = np.zeros((len(note_array), 127))
+    idx = (np.arange(len(note_array)),note_array["pitch"])
+    one_hot[idx] = 1
+    if piano_range:
+        one_hot = one_hot[:, 21:109]
+    return one_hot, ["pc_{:02d}".format(i) for i in range(one_hot.shape[1])]
+
+
+def get_octave_one_hot(part, note_array):
+    one_hot = np.zeros((len(note_array), 10))
+    idx = (np.arange(len(note_array)), np.floor_divide(note_array["pitch"], 12))
+    one_hot[idx] = 1
+    return one_hot, ["octave_{:02d}".format(i) for i in range(10)]
+
+
+def get_vocsep_features(part, return_names=False) -> Tuple[np.ndarray, List]:
+    """
+    Returns features Voice Detection features.
+
+    Parameters
+    ----------
+    part: structured note array or partitura score part
+
+    Returns
+    -------
+    out : np.ndarray
+    feature_fn : List
+    """
+    if isinstance(part, pt.performance.PerformedPart):
+        perf_array = part.note_array()
+        x = perf_array[["onset_sec", "duration_sec"]].astype([("onset_beat", "f4"), ("duration_beat", "f4")])
+        note_array = np.lib.recfunctions.merge_arrays((perf_array, x))
+    elif isinstance(part, np.ndarray):
+        note_array = part
+        part = None
+    else:
+        note_array = part.note_array(include_time_signature=True)
+
+    # octave_oh, octave_names = get_octave_one_hot(part, note_array)
+    # pc_oh, pc_names = get_pc_one_hot(part, note_array)
+    # onset_feature = np.expand_dims(np.remainder(note_array["onset_beat"], note_array["ts_beats"]) / note_array["ts_beats"], 1)
+    # on_feats, _ = pt.musicanalysis.note_features.onset_feature(note_array, part)
+    # duration_feature = np.expand_dims(np.remainder(note_array["duration_beat"], note_array["ts_beats"]) / note_array["ts_beats"], 1)
+    # # new attempt! To delete in case
+    # # duration_feature = np.expand_dims(1- (1/(1+np.exp(-3*(note_array["duration_beat"]/note_array["ts_beats"])))-0.5)*2, 1)
+    # pitch_norm = np.expand_dims(note_array["pitch"] / 127., 1)
+    # on_names = ["barnorm_onset", "piecenorm_onset"]
+    # dur_names = ["barnorm_duration"]
+    # pitch_names = ["pitchnorm"]
+    # names = on_names + dur_names + pitch_names + pc_names + octave_names
+    # out = np.hstack((onset_feature, np.expand_dims(on_feats[:, 1], 1), duration_feature, pitch_norm, pc_oh, octave_oh))
+
+    # octave_oh, octave_names = get_octave_one_hot(part, note_array)
+    # pitch_oh, pitch_names = get_full_pitch_one_hot(part, note_array)
+    # onset_feature = np.expand_dims(np.remainder(note_array["onset_beat"], note_array["ts_beats"]) / note_array["ts_beats"], 1)
+    # on_feats, _ = pt.musicanalysis.note_features.onset_feature(note_array, part)
+    octave_oh, octave_names = get_octave_one_hot(part, note_array)
+    pc_oh, pc_names = get_pc_one_hot(part, note_array)
+    # duration_feature = np.expand_dims(1- (1/(1+np.exp(-3*(note_array["duration_beat"]/note_array["ts_beats"])))-0.5)*2, 1)
+    duration_feature = np.expand_dims(1 - np.tanh(note_array["duration_beat"]/note_array["ts_beats"]), 1)
+    dur_names = ["bar_exp_duration"]
+    # on_names = ["barnorm_onset", "piecenorm_onset"]
+    names = dur_names + pc_names + octave_names
+    out = np.hstack((duration_feature, pc_oh, octave_oh))
+    if return_names:
+        return out, names
+    return out
 
 
 def get_mcma_potential_edges(hg, max_dist=16):
