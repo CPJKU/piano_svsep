@@ -1,10 +1,10 @@
 import numpy as np
 from pytorch_lightning import LightningModule
 import torch
-from struttura.metrics.losses import LinkPredictionLoss, LinearAssignmentLoss, LinearAssignmentLossCE
+# from struttura.metrics.losses import LinkPredictionLoss, LinearAssignmentLoss, LinearAssignmentLossCE
 from torchmetrics import F1Score, Accuracy, Precision, Recall
-from struttura.metrics.slow_eval import MonophonicVoiceF1
-from struttura.metrics.eval import LinearAssignmentScore
+# from struttura.metrics.slow_eval import MonophonicVoiceF1
+# from struttura.metrics.eval import LinearAssignmentScore
 import torch_geometric as pyg
 from torch.nn import functional as F
 from scipy.optimize import linear_sum_assignment

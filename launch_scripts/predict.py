@@ -3,9 +3,10 @@ import partitura as pt
 import partitura.score as spt
 import numpy as np
 import torch
+import torch_geometric as pyg
 from piano_svsep.models.pl_models import PolyphonicVoiceSeparationModel
 from piano_svsep.utils import get_measurewise_truth_edges, get_truth_chords_edges
-from piano_svsep.models.VoicePredPoly import assign_voices, infer_vocstaff_algorithm
+from piano_svsep.utils import assign_voices, infer_vocstaff_algorithm
 from piano_svsep.utils.visualization import save_pyg_graph_as_json
 from piano_svsep.utils import (
     hetero_graph_from_note_array,
@@ -82,10 +83,12 @@ def predict_voice(path_to_model, path_to_score, save_path=None):
     pl_model = PolyphonicVoiceSeparationModel.load_from_checkpoint(path_to_model, map_location="cpu")
     # Prepare the score
     pg_graph, score, tied_notes = prepare_score(path_to_score)
+    # Batch for compatibility
+    pg_graph = pyg.data.Batch.from_data_list([pg_graph])
     # predict the voice assignment
     with torch.no_grad():
         pl_model.module.eval()
-        pred_voices, pred_staff, pg_graph = pl_model.predict_step(pg_graph, return_graph=True)
+        pred_voices, pred_staff, pg_graph = pl_model.predict_step(pg_graph, 0, return_graph=True)
     # Partitura processing for visualization
     part = score[0]
     save_path = save_path if save_path is not None else os.path.splitext(path_to_score)[0] + "_pred.mei"
@@ -187,7 +190,8 @@ def correct_and_save_mei(part,save_path):
 
 
 if __name__ == "__main__":
-    model_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "saved_models", "model.ckpt")
-    score_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "artifacts", "test_score.musicxml")
+    basepath = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    model_path = os.path.join(basepath, "pretrained_models", "model.ckpt")
+    score_path = os.path.join(basepath, "artifacts", "test_score.musicxml")
     score_name = os.path.splitext(os.path.basename(score_path))[0]
     predict_voice(model_path, score_path, os.path.join(os.path.dirname(__file__), "artifacts", f"{score_name}_pred.mei"))

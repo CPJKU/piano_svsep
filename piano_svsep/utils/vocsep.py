@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import scipy as sp
 import partitura
 import torch_geometric as pyg
 from typing import Tuple, List
@@ -129,7 +130,7 @@ def get_mcma_truth_edges(note_array):
         # edge indices between consecutive notes in the same voice.
         truth_edges.append(np.vstack((voc_inds[:-1], voc_inds[1:])))
     truth_edges = np.hstack(truth_edges)
-    return torch.from_numpy(truth_edges)
+    return torch.tensor(truth_edges)
 
 
 def get_pot_chord_edges(note_array, onset_edges):
@@ -293,9 +294,9 @@ def get_edges_mask(subset_edges, total_edges, transpose=True, check_strict_subse
         dropped_edges = subset_edges[(~np.isin(view_subset, view_total))]
         if dropped_edges.shape[0] > 0:
             print(f"{dropped_edges.shape[0]} truth edges are not part of potential edges")
-        return torch.from_numpy(np.isin(view_total, view_subset)).squeeze(), dropped_edges
+        return torch.tensor(np.isin(view_total, view_subset)).squeeze(), dropped_edges
     else:
-        return torch.from_numpy(np.isin(view_total, view_subset)).squeeze()
+        return torch.tensor(np.isin(view_total, view_subset)).squeeze()
 
 
 def preprocess_na_to_monophonic(note_array, score_fn, drop_extra_voices=True, drop_chords=True):
@@ -425,3 +426,194 @@ def remove_ties_to_partial_chords(score):
                             next_note.tie_prev = None
                             note.tie_next = None
                             break
+
+
+def assign_voices(part, predicted_voice_edges: torch.LongTensor, predicted_staff: torch.LongTensor):
+    """
+    Assign voices to the notes of a partitura part based on the predicted edges
+
+    Parameters
+    ----------
+    part: partitura.Part
+        Part to assign voices to
+    predicted_voice_edges: torch.LongTensor
+        Predicted voice edges of size (2, N) where N is the number of edges
+    predicted_staff: torch.LongTensor
+        Predicted staff labels (binary) of size (M,) where M is the number of notes.
+    """
+    note_array = part.note_array()
+    assert len(part.notes_tied) == len(note_array)
+    # remove_beams_from_part(part)
+    predicted_staff = predicted_staff.detach().cpu().numpy().astype(int) + 1 # (make staff start from 1)
+    # sort the notes by the note.id to match the order of the note_array["id"]
+    for i, note in enumerate(part.notes_tied):
+        note.staff = int(predicted_staff[np.where(note_array["id"] == note.id)[0][0]])
+
+    # recompute note_array to include the predicted staff
+    note_array = part.note_array(include_staff=True)
+    preds = predicted_voice_edges.detach().cpu().numpy()
+    # Group notes by measure
+    graph = sp.csr_matrix((np.ones(preds.shape[1]), (preds[0], preds[1])), shape=(len(note_array), len(note_array)))
+    n_components, voice_assignment = sp.csgraph.connected_components(graph, directed=True, return_labels=True)
+    voice_assignment = voice_assignment.astype(int)
+    for measure_idx, measure in enumerate(part.measures):
+        note_idx = np.where((note_array['onset_div'] >= measure.start.t) & (note_array['onset_div'] < measure.end.t))[0]
+        voices_per_measure = voice_assignment[note_idx]
+        # Re-index voices to start from 1 and be consecutive for each measure
+        unique_voices = np.unique(voices_per_measure)
+        voices = np.zeros(n_components, dtype=int)
+        voices[unique_voices] = np.arange(1, len(unique_voices) + 1, dtype=int)
+        voices_per_measure = voices[voices_per_measure]
+        # assert len(unique_voices) < 8, f"More than 8 voices detected in measure {measure_idx}"
+        note_array_seg = note_array[note_idx]
+        note_array_seg["voice"] = voices_per_measure
+        note_array_ends = note_array_seg["onset_div"] + note_array_seg["duration_div"]
+        # group note_array_seg by voice find the start and end of each voice
+        unique_new_voices = np.unique(voices_per_measure)
+        voice_start = np.zeros(len(unique_new_voices))
+        voice_end = np.zeros(len(unique_new_voices))
+        staff_for_grouping = np.zeros(len(unique_new_voices))
+
+        for i in range(len(unique_new_voices)):
+            vidxs = np.where(note_array_seg["voice"] == unique_new_voices[i])[0]
+            voice_start[i] = note_array_seg["onset_div"][vidxs].min()
+            voice_end[i] = note_array_ends[vidxs].max()
+            staff_of_voice = note_array_seg["staff"][vidxs]
+            # if there are more than one staff in the voice, assign the staff number to -1
+            if len(np.unique(staff_of_voice)) > 1:
+                staff_for_grouping[i] = -1
+            else:
+                staff_for_grouping[i] = staff_of_voice[0]
+
+        # if for any two voices, voice_end - voice_start > 0, then the voices could be merged
+        # if the staff of the two voices are the same
+        for i in range(len(unique_new_voices)):
+            for j in range(len(unique_new_voices)):
+                if i == j:
+                    continue
+                if staff_for_grouping[i] == -1 or staff_for_grouping[j] == -1:
+                    continue
+                if staff_for_grouping[i] != staff_for_grouping[j]:
+                    continue
+                if voice_end[i] <= voice_start[j]:
+                    # merge the two voices
+                    note_array_seg["voice"][np.where(note_array_seg["voice"] == unique_new_voices[j])[0]] = unique_new_voices[i]
+                    voice_end[i] = voice_end[j]
+                    voice_start[j] = voice_start[i]
+
+        voices_per_measure = note_array_seg["voice"]
+
+        # group note_array_seg by voice and get the mean of the pitches
+        unique_new_voices = np.unique(voices_per_measure)
+        mean_pitch_per_voice = np.zeros(len(unique_new_voices))
+        for i in range(len(unique_new_voices)):
+            mean_pitch_per_voice[i] = note_array_seg["pitch"][np.where(note_array_seg["voice"] == unique_new_voices[i])[0]].mean()
+
+        # re-assign the voice numbers based on the mean pitch
+        voice_order = np.argsort(mean_pitch_per_voice)[::-1]
+        old_voices_per_measure = voices_per_measure.copy()
+        for i in range(len(unique_new_voices)):
+            voices_per_measure[np.where(old_voices_per_measure == unique_new_voices[voice_order[i]])[0]] = i + 1
+
+        # set the voice attribute of the notes
+        for single_note_idx, est_voice in zip(note_idx, voices_per_measure):
+            if part.notes_tied[single_note_idx].id == note_array["id"][single_note_idx]:
+                part.notes_tied[single_note_idx].voice = est_voice
+            else:
+                for note in part.notes_tied:
+                    if note.id == note_array["id"][single_note_idx]:
+                        note.voice = est_voice
+                        break
+
+
+def infer_vocstaff_algorithm(graph, return_score=True, normalize=True, return_graph=False):
+    """
+    This function infers voice and staff assignments for a given musical graph.
+
+    Parameters:
+    ----------
+    graph : torch_geometric.data.HeteroData
+        A musical graph where each node represents a note and edges represent potential voice connections between notes.
+    return_score : (bool, optional)
+        Determines whether the function should return the F1 scores for the voice, staff, and chord predictions.
+        Default is True.
+
+    Returns:
+    ----------
+    pred_edges_voice: torch.Tensor
+        A tensor of shape (2, N) where N is the number of predicted voice edges.
+        Each column in the tensor represents an edge, with the first row being the source node and
+        the second row being the target node.
+    staff_pred: torch.Tensor
+        A tensor of the same length as the number of notes in the graph.
+        It contains the predicted staff assignment for each note.
+
+    If return_score is True, the function also returns:
+    voice_f1: float
+        The F1 score for the voice predictions.
+    staff_f1 : float
+        The F1 score for the staff predictions.
+    chord_f1 : float
+        The F1 score for the chord predictions.
+    """
+    ps_pool = PostProcessPooling(threshold=0.01)
+    edge_index_dict = graph.edge_index_dict
+    pot_edges = edge_index_dict.pop(("note", "potential", "note"))
+    pot_chord_edges = edge_index_dict.pop(("note", "chord_potential", "note"))
+    staff = graph["note"].staff.long()
+    pitches = graph["note"].pitch
+    batch = torch.zeros_like(pitches, dtype=torch.long)
+    num_nodes = len(pitches)
+    onset_beats = graph["note"].onset_beat
+    duration_beats = graph["note"].duration_beat
+    offset_beats = onset_beats + duration_beats
+    # split staffs on pitch 60
+    staff_pred = torch.zeros_like(pitches)
+    staff_pred[pitches < 60] = 1
+    # NOTE: need to trim the chord edges to keep highest.
+    pred_edges = list()
+    pred_chord_edges = list()
+    for i in range(2):
+        staff_idx = torch.where(staff_pred == i)[0]
+        staff_pot_edges = pot_edges[:, torch.isin(pot_edges[0], staff_idx) & torch.isin(pot_edges[1], staff_idx)]
+        onset_score = torch.abs(
+            onset_beats[staff_pot_edges[1]] - offset_beats[staff_pot_edges[0]])
+        pitch_score = torch.abs(pitches[staff_pot_edges[1]] - pitches[staff_pot_edges[0]])
+        # normalize the scores between 0 and 1
+        if normalize:
+            onset_score = 1 - (onset_score - onset_score.min()) / (onset_score.max() - onset_score.min() + 1e-8)
+            pitch_score = 1 - (pitch_score - pitch_score.min()) / (pitch_score.max() - pitch_score.min() + 1e-8)
+        staff_pot_score = onset_score * pitch_score
+        staff_pot_chord_edges = pot_chord_edges[:, torch.isin(pot_chord_edges[0], staff_idx) & torch.isin(pot_chord_edges[1], staff_idx)]
+        staff_pot_chord_score = torch.ones(staff_pot_chord_edges.shape[1])
+        new_edge_index, new_edge_probs, unpool_info, reduced_num_nodes = ps_pool(
+            staff_pot_edges, staff_pot_score, staff_pot_chord_edges, staff_pot_chord_score, batch, num_nodes)
+        post_monophonic_edges = linear_assignment(new_edge_probs, new_edge_index, reduced_num_nodes, threshold=0.01)
+        post_pred_edges = ps_pool.unpool(post_monophonic_edges, reduced_num_nodes, unpool_info)
+        pred_edges.append(post_pred_edges)
+        pred_chord_edges.append(staff_pot_chord_edges)
+
+    pred_chord_edges = torch.cat(pred_chord_edges, dim=-1)
+    pred_edges_voice = torch.cat(pred_edges, dim=-1)
+
+    if return_score:
+        # sort the predicted chord edges
+        pred_chord_edges = pred_chord_edges[:, torch.argsort(pred_chord_edges[0])]
+        truth_edges = edge_index_dict.pop(("note", "truth", "note"))
+        voice_f1 = compute_voice_f1_score(pred_edges_voice, truth_edges, num_nodes).item()
+        truth_chord_edges = edge_index_dict.pop(("note", "chord_truth", "note"))
+        staff_metric = Accuracy(task="multiclass", num_classes=2).to(pred_edges_voice.device)
+        staff_acc = staff_metric(staff_pred, staff).item()
+        chord_f1 = compute_voice_f1_score(pred_chord_edges, truth_chord_edges, num_nodes).item()
+        return pred_edges_voice, staff_pred, voice_f1, staff_acc, chord_f1
+    # add the chord edges to the pred_edges_voice
+    pred_edges_voice = torch.cat((pred_edges_voice, pred_chord_edges), dim=-1)
+    # sort the predicted voice edges
+    pred_edges_voice = pred_edges_voice[:, torch.argsort(pred_edges_voice[0])]
+    if return_graph:
+        graph["note", "chord_potential", "note"].edge_index = pot_chord_edges
+        graph["note", "potential", "note"].edge_index = pot_edges
+        graph["note", "chord_predicted", "note"].edge_index = pred_chord_edges
+        graph["note", "predicted", "note"].edge_index = pred_edges_voice
+        return pred_edges_voice, staff_pred, graph
+    return pred_edges_voice, staff_pred

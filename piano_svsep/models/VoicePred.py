@@ -1,9 +1,9 @@
 from torch.optim import Adam, lr_scheduler
-from struttura.models.core import *
+# from struttura.models.core import *
 from pytorch_lightning import LightningModule
 from torchmetrics import F1Score, Accuracy
 import torch
-from struttura.models.core import MLP, GCN, UNet
+# from struttura.models.core import MLP, GCN, UNet
 from torch_scatter import scatter_add
 from random import randint
 import random

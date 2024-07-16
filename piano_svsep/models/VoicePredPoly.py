@@ -6,7 +6,8 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 from torch_geometric.utils import coalesce, scatter, softmax
-from struttura.models.vocsep.VoicePredGeom import GNNEncoder, EdgeDecoder
+# from struttura.models.vocsep.VoicePredGeom import GNNEncoder, EdgeDecoder
+from piano_svsep.models.VoicePredGeom import EdgeDecoder, GNNEncoder
 
 
 class UnpoolInfo(NamedTuple):

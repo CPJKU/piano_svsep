@@ -1,3 +1,1 @@
-from .VoicePred import GraphVoiceSeparationModel, GraphVoiceSeparationModel
-from .pl_models import UnetVoiceSeparationModel, VoiceLinkPredictionModel, VoiceLinkPredictionLightModelPG, HeteroVoiceLinkPredictionModel, MetricalVoiceLinkPredictionModel
-
+from piano_svsep.models.pl_models import *

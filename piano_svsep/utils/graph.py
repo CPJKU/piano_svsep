@@ -18,15 +18,15 @@ class HeteroScoreGraph(object):
         if self.node_features:
             self.node_features = [feat for feat in self.node_features if note_features.dtype.fields[feat][0] != np.dtype('U256')]
             self.features = self.features[self.node_features]
-        self.x = torch.from_numpy(np.asarray(rfn.structured_to_unstructured(self.features) if self.node_features else self.features, dtype=np.float32))
+        self.x = torch.tensor(np.asarray(rfn.structured_to_unstructured(self.features)) if self.node_features else self.features , dtype = torch.float32)
         assert etypes is not None
         self.etypes = {t: i for i, t in enumerate(etypes)}
         self.note_array = note_array
-        self.edge_type = torch.from_numpy(edges[-1]).long()
-        self.edge_index = torch.from_numpy(edges[:2]).long()
-        self.edge_weights = torch.ones(len(self.edge_index[0])) if edge_weights is None else torch.from_numpy(edge_weights)
+        self.edge_type = torch.tensor(edges[-1], dtype=torch.long)
+        self.edge_index = torch.tensor(edges[:2], dtype=torch.long )
+        self.edge_weights = torch.ones(len(self.edge_index[0])) if edge_weights is None else torch.tensor(edge_weights)
         self.name = name
-        self.y = labels if labels is None else torch.from_numpy(labels)
+        self.y = labels if labels is None else torch.tensor(labels)
 
     def adj(self, weighted=False):
         if weighted:
@@ -223,15 +223,15 @@ def score_graph_to_pyg(score_graph: HeteroScoreGraph):
         if hasattr(score_graph, "truth_chord_edges"):
             data["note", "chord_truth", "note"].edge_index = score_graph.truth_chord_edges.clone().long()
         # add pitch, onset, offset info in divs that is necessary for evaluation
-        data["note"].pitch = torch.from_numpy(score_graph.note_array["pitch"].copy())
-        data["note"].onset_div = torch.from_numpy(score_graph.note_array["onset_div"].copy())
-        data["note"].duration_div = torch.from_numpy(score_graph.note_array["duration_div"].copy())
-        data["note"].onset_beat = torch.from_numpy(score_graph.note_array["onset_beat"].copy())
-        data["note"].duration_beat = torch.from_numpy(score_graph.note_array["duration_beat"].copy())
-        data["note"].ts_beats = torch.from_numpy(score_graph.note_array["ts_beats"].copy())
+        data["note"].pitch = torch.tensor(score_graph.note_array["pitch"].copy())
+        data["note"].onset_div = torch.tensor(score_graph.note_array["onset_div"].copy())
+        data["note"].duration_div = torch.tensor(score_graph.note_array["duration_div"].copy())
+        data["note"].onset_beat = torch.tensor(score_graph.note_array["onset_beat"].copy())
+        data["note"].duration_beat = torch.tensor(score_graph.note_array["duration_beat"].copy())
+        data["note"].ts_beats = torch.tensor(score_graph.note_array["ts_beats"].copy())
         # staff is shifted to be 0-1 instead of 1-2
-        data["note"].staff = torch.from_numpy(score_graph.note_array["staff"].copy() -1)
-        data["note"].voice = torch.from_numpy(score_graph.note_array["voice"].copy())
+        data["note"].staff = torch.tensor(score_graph.note_array["staff"].copy() -1)
+        data["note"].voice = torch.tensor(score_graph.note_array["voice"].copy())
         assert (data["note"].staff).min() == 0
         # assert (data["note"].staff).max() == 1
         # add name
@@ -243,3 +243,53 @@ def score_graph_to_pyg(score_graph: HeteroScoreGraph):
         raise ValueError("Only HeteroScoreGraph is supported for now")
 
     return data
+
+
+def add_reverse_edges(graph, mode):
+    if isinstance(graph, HeteroScoreGraph):
+        if mode == "new_type":
+            # Add reverse During Edges
+            graph.edge_index = torch.cat((graph.edge_index, graph.get_edges_of_type("during").flip(0)), dim=1)
+            graph.edge_type = torch.cat((graph.edge_type, 2 + torch.zeros(graph.edge_index.shape[1] - graph.edge_type.shape[0],dtype=torch.long)), dim=0)
+            # Add reverse Consecutive Edges
+            graph.edge_index = torch.cat((graph.edge_index, graph.get_edges_of_type("consecutive").flip(0)), dim=1)
+            graph.edge_type = torch.cat((graph.edge_type, 4+torch.zeros(graph.edge_index.shape[1] - graph.edge_type.shape[0], dtype=torch.long)), dim=0)
+            graph.etypes["consecutive_rev"] = 4
+        else:
+            graph.edge_index = torch.cat((graph.edge_index, graph.edge_index.flip(0)), dim=1)
+            raise NotImplementedError("To undirected is not Implemented for HeteroScoreGraph.")
+    # elif isinstance(graph, ScoreGraph):
+    #     raise NotImplementedError("To undirected is not Implemented for ScoreGraph.")
+    else:
+        if mode == "new_type":
+            # add reversed consecutive edges
+            graph["note", "consecutive_rev", "note"].edge_index = graph[
+                "note", "consecutive", "note"
+            ].edge_index[[1, 0]]
+            # add reversed during edges
+            graph["note", "during_rev", "note"].edge_index = graph[
+                "note", "during", "note"
+            ].edge_index[[1, 0]]
+            # add reversed rest edges
+            graph["note", "rest_rev", "note"].edge_index = graph[
+                "note", "rest", "note"
+            ].edge_index[[1, 0]]
+        elif mode == "undirected":
+            graph = pyg.transforms.ToUndirected()(graph)
+        else:
+            raise ValueError("mode must be either 'new_type' or 'undirected'")
+    return graph
+
+
+def add_reverse_edges_from_edge_index(edge_index, edge_type, mode="new_type"):
+    if mode == "new_type":
+        unique_edge_types = torch.unique(edge_type)
+        for type in unique_edge_types:
+            if type == 0:
+                continue
+            edge_index = torch.cat((edge_index, edge_index[:, edge_type == type].flip(0)), dim=1)
+            edge_type = torch.cat((edge_type, torch.max(edge_type) + torch.zeros(edge_index.shape[1] - edge_type.shape[0], dtype=torch.long).to(edge_type.device)), dim=0)
+    else:
+        edge_index = torch.cat((edge_index, edge_index.flip(0)), dim=1)
+        edge_type = torch.cat((edge_type, edge_type), dim=0)
+    return edge_index, edge_type
