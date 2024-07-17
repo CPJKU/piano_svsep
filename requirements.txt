@@ -4,3 +4,6 @@ scipy==1.14.0
 pytorch_lightning==2.3.3
 verovio==4.2.1
 torch-scatter==2.1.2
+joblib==1.0.1
+gitpython==3.1.14
+tqdm==4.61.0

@@ -5,6 +5,14 @@ import partitura
 import torch_geometric as pyg
 from typing import Tuple, List
 import partitura as pt
+import torch.nn as nn
+from torch_scatter import scatter_add
+from scipy.sparse import coo_matrix
+from torchmetrics import Accuracy
+
+from piano_svsep.models.VoicePredPoly import PostProcessPooling
+from scipy.optimize import linear_sum_assignment
+
 
 
 def get_pc_one_hot(part, note_array):
@@ -617,3 +625,62 @@ def infer_vocstaff_algorithm(graph, return_score=True, normalize=True, return_gr
         graph["note", "predicted", "note"].edge_index = pred_edges_voice
         return pred_edges_voice, staff_pred, graph
     return pred_edges_voice, staff_pred
+
+
+
+def linear_assignment(edge_pred_mask_prob, pot_edges, num_notes, threshold=0.5):
+    # Solve with Hungarian Algorithm and then trim predictions.
+    row = pot_edges[0].cpu().numpy()
+    col = pot_edges[1].cpu().numpy()
+    new_probs = edge_pred_mask_prob.clone()
+    # cost = edge_pred_mask_prob.max() - edge_pred_mask_prob
+    cost = edge_pred_mask_prob.cpu().numpy()
+    cost_matrix = coo_matrix((cost, (row, col)), shape=(num_notes, num_notes))
+    # Sparse version is not working yet
+    # row_ind, col_ind = min_weight_full_bipartite_matching(cost_matrix)
+    row_ind, col_ind = linear_sum_assignment(cost_matrix.todense(), maximize=True)
+    # numpy function to get [row_ind, col_ind]
+    new_edge_index = torch.tensor(np.vstack((row_ind, col_ind))).to(edge_pred_mask_prob.device)
+    mask_potential = isin_pairwise(pot_edges, new_edge_index, assume_unique=True)
+    new_probs[~mask_potential] = 0
+    mask_over_potential = new_probs > threshold
+    pred_edges = pot_edges[:, mask_over_potential]
+    return pred_edges
+
+
+def compute_voice_f1_score(pred_edges, truth_edges, num_nodes):
+    which_true_edges_in_pred = isin_pairwise(truth_edges, pred_edges, assume_unique=True).float()
+    which_pred_edges_in_true = isin_pairwise(pred_edges, truth_edges, assume_unique=True).float()
+    ones_pred = torch.ones(pred_edges.shape[1]).to(pred_edges.device)
+    ones_true = torch.ones(truth_edges.shape[1]).to(truth_edges.device)
+    multiplicity_pred = scatter_add(ones_pred, pred_edges[0], out=torch.zeros(num_nodes).to(pred_edges.device)) + 1e-8
+    weights_pred = multiplicity_pred[pred_edges[0]]
+    multiplicity_true = scatter_add(ones_true, truth_edges[0], out=torch.zeros(num_nodes).to(truth_edges.device)) + 1e-8
+    weights_true = multiplicity_true[truth_edges[0]]
+    precision = (which_pred_edges_in_true / weights_pred).sum() / (ones_pred / weights_pred).sum()
+    recall = (which_true_edges_in_pred / weights_true).sum() / (ones_true / weights_true).sum()
+    f1 = 2 * precision * recall / (precision + recall)
+    return f1
+
+
+def isin_pairwise(element, test_elements, assume_unique=True):
+    """Like isin function of torch, but every element in the sequence is a pair of integers.
+    # TODO: check if this solution can be better https://stackoverflow.com/questions/71708091/is-there-an-equivalent-numpy-function-to-isin-that-works-row-based
+
+    Args:
+        element (torch.Tensor): Tensor of shape (2, N) where N is the number of elements.
+        test_elements (torch.Tensor): Tensor of shape (2, M) where M is the number of elements to test.
+        assume_unique (bool, optional): If True, the input arrays are both assumed to be unique, which can speed up the calculation. Defaults to True.
+
+        Returns:
+            torch.Tensor: Tensor of shape (M,) with boolean values indicating whether the element is in the test_elements.
+
+    """
+
+    def cantor_pairing(x, y):
+        return (x + y) * (x + y + 1) // 2 + y
+
+    element_cantor_proj = cantor_pairing(element[0], element[1])
+    test_elements_cantor_proj = cantor_pairing(test_elements[0], test_elements[1])
+    return torch.isin(element_cantor_proj, test_elements_cantor_proj, assume_unique=assume_unique)
+
