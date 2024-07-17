@@ -88,7 +88,7 @@ def predict_voice(path_to_model, path_to_score, save_path=None):
     # predict the voice assignment
     with torch.no_grad():
         pl_model.module.eval()
-        pred_voices, pred_staff, pg_graph = pl_model.predict_step(pg_graph, 0, return_graph=True)
+        pred_voices, pred_staff, pg_graph = pl_model.predict_step(pg_graph, return_graph=True)
     # Partitura processing for visualization
     part = score[0]
     save_path = save_path if save_path is not None else os.path.splitext(path_to_score)[0] + "_pred.mei"
@@ -194,4 +194,4 @@ if __name__ == "__main__":
     model_path = os.path.join(basepath, "pretrained_models", "model.ckpt")
     score_path = os.path.join(basepath, "artifacts", "test_score.musicxml")
     score_name = os.path.splitext(os.path.basename(score_path))[0]
-    predict_voice(model_path, score_path, os.path.join(os.path.dirname(__file__), "artifacts", f"{score_name}_pred.mei"))
+    predict_voice(model_path, score_path, os.path.join(basepath, "artifacts", f"{score_name}_pred.mei"))

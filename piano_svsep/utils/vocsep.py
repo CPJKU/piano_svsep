@@ -461,8 +461,8 @@ def assign_voices(part, predicted_voice_edges: torch.LongTensor, predicted_staff
     note_array = part.note_array(include_staff=True)
     preds = predicted_voice_edges.detach().cpu().numpy()
     # Group notes by measure
-    graph = sp.csr_matrix((np.ones(preds.shape[1]), (preds[0], preds[1])), shape=(len(note_array), len(note_array)))
-    n_components, voice_assignment = sp.csgraph.connected_components(graph, directed=True, return_labels=True)
+    graph = sp.sparse.csr_matrix((np.ones(preds.shape[1]), (preds[0], preds[1])), shape=(len(note_array), len(note_array)))
+    n_components, voice_assignment = sp.sparse.csgraph.connected_components(graph, directed=True, return_labels=True)
     voice_assignment = voice_assignment.astype(int)
     for measure_idx, measure in enumerate(part.measures):
         note_idx = np.where((note_array['onset_div'] >= measure.start.t) & (note_array['onset_div'] < measure.end.t))[0]
