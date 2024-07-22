@@ -2,7 +2,8 @@ from torch.nn import functional as F
 import torch
 from piano_svsep.utils import isin_pairwise, compute_voice_f1_score, linear_assignment, infer_vocstaff_algorithm
 from pytorch_lightning import LightningModule
-from piano_svsep.models.VoicePredPoly import PolyphonicLinkPredictionModel, PostProcessPooling
+from piano_svsep.models.models import PianoSVSep
+from piano_svsep.postprocessing import PostProcessPooling
 from piano_svsep.utils import add_reverse_edges
 from torchmetrics import F1Score, Accuracy
 import numpy as np
@@ -34,7 +35,7 @@ class AlgorithmicVoiceSeparationModel(LightningModule):
         return pred_edges, pred_staff
 
 
-class PolyphonicVoiceSeparationModel(LightningModule):
+class PLPianoSVSep(LightningModule):
     def __init__(
             self,
             in_feats,
@@ -67,7 +68,7 @@ class PolyphonicVoiceSeparationModel(LightningModule):
                               ('note', 'during_rev', 'note'),
                               ('note', 'rest_rev', 'note'),
                               ])
-        self.module = PolyphonicLinkPredictionModel(
+        self.module = PianoSVSep(
             input_features=in_feats, hidden_features=n_hidden, num_layers=n_layers, activation=activation,
             dropout=dropout, conv_type=conv_type, gnn_metadata=self.gnn_metadata, chord_pooling_mode=chord_pooling_mode,
             staff_feedback=staff_feedback, edge_feature_feedback=edge_feature_feedback, after_encoder_frontend=after_encoder_frontend)

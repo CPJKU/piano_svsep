@@ -10,7 +10,7 @@ from torch_scatter import scatter_add
 from scipy.sparse import coo_matrix
 from torchmetrics import Accuracy
 
-from piano_svsep.models.VoicePredPoly import PostProcessPooling
+from piano_svsep.postprocessing import PostProcessPooling
 from scipy.optimize import linear_sum_assignment
 
 

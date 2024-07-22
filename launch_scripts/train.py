@@ -1,7 +1,7 @@
 import torch
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
-from piano_svsep.models.pl_models import PolyphonicVoiceSeparationModel, AlgorithmicVoiceSeparationModel
+from piano_svsep.models.pl_models import PLPianoSVSep, AlgorithmicVoiceSeparationModel
 from piano_svsep.data.mix_vs import GraphPolyphonicVoiceSeparationDataModule
 import argparse
 from pytorch_lightning import Trainer, seed_everything
@@ -85,7 +85,7 @@ def main():
         pos_weights = {"voice": 1, "chord": 1}
 
     if args.method == "vocsep":
-        model = PolyphonicVoiceSeparationModel(datamodule.features, args.n_hidden, args.n_layers, dropout=args.dropout,
+        model = PLPianoSVSep(datamodule.features, args.n_hidden, args.n_layers, dropout=args.dropout,
                                                lr=args.lr, weight_decay=args.weight_decay, pos_weights=pos_weights,
                                                conv_type=args.model, chord_pooling_mode=args.chord_pooling_mode,
                                                feat_norm_scale=args.feat_norm_scale, staff_feedback=args.staff_feedback,

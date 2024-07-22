@@ -4,8 +4,7 @@ import partitura.score as spt
 import numpy as np
 import torch
 import torch_geometric as pyg
-from piano_svsep.models.pl_models import PolyphonicVoiceSeparationModel
-from piano_svsep.utils import get_measurewise_truth_edges, get_truth_chords_edges
+from piano_svsep.models.pl_models import PLPianoSVSep
 from piano_svsep.utils import assign_voices, infer_vocstaff_algorithm
 from piano_svsep.utils.visualization import save_pyg_graph_as_json
 from piano_svsep.utils import (
@@ -24,7 +23,6 @@ def prepare_score(path_to_score, exclude_grace=True):
     score = pt.load_score(path_to_score, force_note_ids=True)
     if len(score) > 1:
         score = pt.score.Score(pt.score.merge_parts(score.parts))
-        # raise ValueError("Only single part scores are supported")
     # Preprocess score for voice separation
     tie_couples = remove_ties_acros_barlines(score, return_ids=True)
     # Remove beams
@@ -55,7 +53,7 @@ def prepare_score(path_to_score, exclude_grace=True):
 
     note_array = score[0].note_array(
         include_time_signature=True,
-        include_grace_notes=True,
+        include_grace_notes=True, # this is just to check that there are not grace notes left
         include_staff=True,
     )
     # get the measure number for each note in the note array
@@ -80,7 +78,7 @@ def prepare_score(path_to_score, exclude_grace=True):
 
 def predict_voice(path_to_model, path_to_score, save_path=None):
     # Load the model
-    pl_model = PolyphonicVoiceSeparationModel.load_from_checkpoint(path_to_model, map_location="cpu")
+    pl_model = PLPianoSVSep.load_from_checkpoint(path_to_model, map_location="cpu")
     # Prepare the score
     pg_graph, score, tied_notes = prepare_score(path_to_score)
     # Batch for compatibility
@@ -101,9 +99,6 @@ def predict_voice(path_to_model, path_to_score, save_path=None):
     correct_and_save_mei(part,save_path)
 
 
-    # pt.save_mei(part, save_path)
-
-
 def predict_voice_baseline(path_to_score, save_path=None):
     # Prepare the score
     pg_graph, score, tied_notes = prepare_score(path_to_score)
@@ -119,32 +114,6 @@ def predict_voice_baseline(path_to_score, save_path=None):
     spt.infer_beaming(part)
     save_path = save_path if save_path is not None else os.path.splitext(path_to_score)[0] + "_baseline_pred.mei"
     pt.save_mei(part, save_path)
-
-
-def predict_voice_nakamura(path_to_score, path_to_pred, save_path=None):
-    import pandas as pd
-
-    # Prepare the score
-    pg_graph, score, tied_notes = prepare_score(path_to_score, exclude_grace=True)
-    # predict the voice assignment
-    pred = pd.read_csv(path_to_pred, encoding="utf-8")
-    note_array_pred = pred.to_records()
-    note_measures_pred = pred["measure_number"].to_numpy()
-    pred_voices = get_measurewise_truth_edges(note_array_pred, note_measures_pred)
-    pred_staff = note_array_pred["staff"]
-    pred_staff = torch.tensor(pred_staff).long()
-    pred_staff = pred_staff - 1
-    pred_voices = torch.tensor(pred_voices).long()
-    # Partitura processing for visualization
-    part = score[0]
-    assign_voices(part, pred_voices, pred_staff)
-    tie_notes_over_measures(part, tied_notes)
-    spt.fill_rests(part, measurewise=True)
-    spt.infer_beaming(part)
-    save_path = save_path if save_path is not None else os.path.splitext(path_to_score)[0] + "_pred.mei"
-    pt.save_mei(part, save_path)
-    correct_and_save_mei(part,save_path)
-    # pt.save_mei(part, save_path)
 
 
 def tie_notes_over_measures(part, tied_notes):
