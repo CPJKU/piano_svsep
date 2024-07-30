@@ -73,7 +73,7 @@ class PLPianoSVSep(LightningModule):
             dropout=dropout, conv_type=conv_type, gnn_metadata=self.gnn_metadata, chord_pooling_mode=chord_pooling_mode,
             staff_feedback=staff_feedback, edge_feature_feedback=edge_feature_feedback, after_encoder_frontend=after_encoder_frontend)
         self.rev_edges = rev_edges
-        self.threshold = 0.1
+        self.threshold = 0.5
         self.chord_pooling_mode = chord_pooling_mode
         self.ps_pool = PostProcessPooling()
         self.pitch_embedding = torch.nn.Embedding(12, 16)
@@ -127,7 +127,6 @@ class PLPianoSVSep(LightningModule):
             loss = voice_loss + staff_loss + feature_normalization_loss * self.feat_norm_scale
 
         edge_pred_mask_prob = torch.sigmoid(edge_pred_mask_logits)
-        # TODO: what should be batch size be?
         self.log(f"{step_type}_voice_loss", voice_loss.item(), on_step=False, on_epoch=True, prog_bar=False,
                  batch_size=graph.num_graphs)
         self.log(f"{step_type}_staff_loss", staff_loss.item(), on_step=False, on_epoch=True, prog_bar=False,
@@ -161,12 +160,6 @@ class PLPianoSVSep(LightningModule):
             post_monophonic_edges = linear_assignment(new_edge_probs, new_edge_index, reduced_num_nodes, threshold=self.threshold)
             post_pred_edges = self.ps_pool.unpool(post_monophonic_edges, reduced_num_nodes, unpool_info)
             f1_post = compute_voice_f1_score(post_pred_edges, truth_edges, num_nodes)
-            # which_pred_edges_in_true = isin_pairwise(pred_edges, truth_edges, assume_unique=True)
-            # which_true_edges_in_pred = isin_pairwise(truth_edges, pred_edges, assume_unique=True)
-            # tp = which_pred_edges_in_true.sum()
-            # fp = (~which_true_edges_in_pred).sum()
-            # fn = (~which_pred_edges_in_true).sum()
-            # f1 = 2 * tp / (2 * tp + fp + fn)
             self.log(f"{step_type}_post_processing_f1", f1_post.item(),
                      on_step=False, on_epoch=True, prog_bar=False, batch_size=1)
         return loss, pooling_mask_logits, pot_chord_edges, truth_chord_edges
@@ -179,10 +172,6 @@ class PLPianoSVSep(LightningModule):
     def validation_step(self, batch, batch_idx, **kwargs):
         graph = batch[0]
         loss, pooling_mask_logits, pot_chord_edges, truth_chord_edges = self._common_step(graph, step_type="val", **kwargs)
-        # TODO: this is problematic Post-processing
-        # IDEA: Implement slow version that loops through potential edges, and unpool_version
-        # Trim first pot_edges by threshold, document this process (it can be interesting for the paper)
-
         if self.chord_pooling_mode != "none":
             pooling_mask_prob = torch.sigmoid(pooling_mask_logits)
             truth_pooling_mask = isin_pairwise(pot_chord_edges, truth_chord_edges, assume_unique=True)
