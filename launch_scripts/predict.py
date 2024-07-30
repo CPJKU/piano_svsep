@@ -17,6 +17,7 @@ from piano_svsep.utils import (
     get_pot_chord_edges,
     )
 from lxml import etree
+import argparse
 
 
 def prepare_score(path_to_score, exclude_grace=True):

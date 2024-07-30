@@ -449,23 +449,23 @@ def assign_voices(part, predicted_voice_edges: torch.LongTensor, predicted_staff
     predicted_staff: torch.LongTensor
         Predicted staff labels (binary) of size (M,) where M is the number of notes.
     """
+    
+    predicted_staff = predicted_staff.detach().cpu().numpy().astype(int) + 1 # (make staff start from 1)
     note_array = part.note_array()
     assert len(part.notes_tied) == len(note_array)
-    # remove_beams_from_part(part)
-    predicted_staff = predicted_staff.detach().cpu().numpy().astype(int) + 1 # (make staff start from 1)
-    # sort the notes by the note.id to match the order of the note_array["id"]
+    # sort the notes by the note.id to match the order of the note_array["id"] which was used as the input to the model
     for i, note in enumerate(part.notes_tied):
         note.staff = int(predicted_staff[np.where(note_array["id"] == note.id)[0][0]])
-
-    # recompute note_array to include the predicted staff
+    
+    # recompute note_array to include the now newly added staff
     note_array = part.note_array(include_staff=True)
     preds = predicted_voice_edges.detach().cpu().numpy()
-    # Group notes by measure
+    # build the adjacency matrix
     graph = sp.sparse.csr_matrix((np.ones(preds.shape[1]), (preds[0], preds[1])), shape=(len(note_array), len(note_array)))
     n_components, voice_assignment = sp.sparse.csgraph.connected_components(graph, directed=True, return_labels=True)
     voice_assignment = voice_assignment.astype(int)
     for measure_idx, measure in enumerate(part.measures):
-        note_idx = np.where((note_array['onset_div'] >= measure.start.t) & (note_array['onset_div'] < measure.end.t))[0]
+        note_idx = np.where((note_array['onset_div'] >= measure.start.t) & (note_array['onset_div'] < measure.end.t))[0]       
         voices_per_measure = voice_assignment[note_idx]
         # Re-index voices to start from 1 and be consecutive for each measure
         unique_voices = np.unique(voices_per_measure)
