@@ -34,15 +34,40 @@ To install using pip simply navigate to the root of the project and run:
 
 ## Usage
 
-To train the model you can use the following command:
-```shell
-  python launch_scripts/train.py --dataset_path path/to/dataset --output_path path/to/output
-```
+### Prediction
 
 To predict the voices and staves of a MIDI or musicXML file you can use the following command:
 ```shell
   python launch_scripts/predict.py --input_score path/to/midi --output_path path/to/output
 ```
+
+#### Example
+
+To predict the voice assignment for a given score using a pre-trained model, you can use the following command:
+```shell
+  python launch_scripts/predict.py --model_path pretrained_models/model.ckpt --score_path artifacts/test_score.musicxml --save_path artifacts/test_score_pred.mei
+```
+
+### Train your own model
+
+To train or test the voice separation model using the provided script, you can use the following command:
+
+```bash
+python launch_scripts/train.py --gpus 0 --n_layers 3 --n_hidden 128 --n_epochs 50 --dropout 0.3 --lr 0.0005 --weight_decay 0.0001 --num_workers 8 --collection musescore_pop --model SageConv --batch_size 32 --method vocsep --use_wandb --tags "experiment1,voice_separation"
+```
+
+This command will:
+- Use GPU 0 for training.
+- Set the number of layers to 3 and the number of hidden units to 128.
+- Train the model for 50 epochs with a dropout rate of 0.3.
+- Use a learning rate of 0.0005 and a weight decay of 0.0001.
+- Use 8 workers for data loading.
+- Use the `musescore_pop` collection and the `SageConv` model.
+- Set the batch size to 32.
+- Use the `vocsep` method for training.
+- Enable logging with WandB and add the tags "experiment1" and "voice_separation".
+
+For more details on the available command-line arguments, refer to the script's documentation.
 
 
 ## Cite Us
@@ -56,5 +81,9 @@ To predict the voices and staves of a MIDI or musicXML file you can use the foll
 }
 ```
 
-## Aknowledgements
+## Acknowledgments
+
+This project receives funding from the European Research Council (ERC) under 
+the European Union's Horizon 2020 research and innovation programme under grant 
+agreement No 101019375 ["Whither Music?"](https://www.jku.at/en/institute-of-computational-perception/research/projects/whither-music/).
 

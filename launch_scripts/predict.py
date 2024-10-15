@@ -207,11 +207,16 @@ def correct_and_save_mei(part,save_path):
         f.write(etree.tostring(mei, pretty_print=True).decode("utf-8"))
 
 
-
 if __name__ == "__main__":
-    # TODO: Add argparse
+    parser = argparse.ArgumentParser(description="Predict voice assignment for a given score using a pre-trained model.")
+    parser.add_argument("--model_path", type=str, default=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pretrained_models", "model.ckpt"), help="Path to the pre-trained model checkpoint.")
+    parser.add_argument("--score_path", type=str, default=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "artifacts", "test_score.musicxml"), help="Path to the score file.")
+    parser.add_argument("--save_path", type=str, default=None, help="Path to save the predicted score. If None, the predicted score will be saved in the same directory as the input score with '_pred' appended to the filename.")
+
+    args = parser.parse_args()
+
     basepath = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    model_path = os.path.join(basepath, "pretrained_models", "model.ckpt")
-    score_path = os.path.join(basepath, "artifacts", "test_score.musicxml")
-    score_name = os.path.splitext(os.path.basename(score_path))[0]
-    predict_voice(model_path, score_path, os.path.join(basepath, "artifacts", f"{score_name}_pred.mei"))
+    score_name = os.path.splitext(os.path.basename(args.score_path))[0]
+    save_path = args.save_path if args.save_path is not None else os.path.join(basepath, "artifacts", f"{score_name}_pred.mei")
+
+    predict_voice(args.model_path, args.score_path, save_path)
