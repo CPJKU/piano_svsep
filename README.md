@@ -6,7 +6,12 @@
 **This repo is still under development, it will be finalized shortly** 
 
 # Piano Staff and Voice Separation (Piano_SVSep)
+
 Code for the paper "Cluster and Separate: A GNN Approach to Voice and Staff Prediction for Score Engraving".
+
+_Nominated as Best Paper at ISMIR 2024!!!_
+
+Read the full paper [here](https://arxiv.org/abs/2407.21030)
 
 This work approaches the problem of separating the notes from a quantised symbolic music piece (e.g., a MIDI file) into multiple voices and staves. This is a fundamental part of the larger task of music score engraving (or score type-setting), which aims to produce readable musical scores for human performers. We focus on piano music and support homophonic voices, i.e., voices that can contain chords, and cross-staff voices, which are notably difficult tasks that have often been overlooked in previous research. We propose an end-to-end system based on graph neural networks that clusters notes that belong to the same chord and connects them with edges if they are part of a voice. Our results show clear and consistent improvements over a previous approach on two datasets of different styles. To aid the qualitative analysis of our results, we support the export in symbolic music formats and provide a direct visualisation of our outputs graph over the musical score. 
 
@@ -16,18 +21,28 @@ This work approaches the problem of separating the notes from a quantised symbol
 To install Piano_SVSep you first need to install the Pytorch version suitable for your system.
 You can find the instructions [here](https://pytorch.org/get-started/locally/).
 
-You also need to install Pytorch Geometric. You can find the instructions [here](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html).
-We recommend to use conda:
+Then clone the repo:
 ```shell
-conda install conda install pyg -c pyg
+  git clone https://github.com/cpjku/piano_svsep.git
+  cd piano_svsep
 ```
 
-You can install the rest of the dependencies using pip:
-```
-pip install -r requirements.txt
+To install using pip simply navigate to the root of the project and run:
+```shell
+  pip install .
 ```
 
 ## Usage
+
+To train the model you can use the following command:
+```shell
+  python launch_scripts/train.py --dataset_path path/to/dataset --output_path path/to/output
+```
+
+To predict the voices and staves of a MIDI or musicXML file you can use the following command:
+```shell
+  python launch_scripts/predict.py --input_score path/to/midi --output_path path/to/output
+```
 
 
 ## Cite Us
@@ -40,3 +55,6 @@ pip install -r requirements.txt
   year={2024}
 }
 ```
+
+## Aknowledgements
+
