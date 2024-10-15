@@ -12,10 +12,10 @@ setup(
     packages=find_packages(),
     setup_requires=["torch"],
     install_requires=[
-        "pytorch-geometric==1.7.2",
+        "torch_geometric",
         "partitura==1.5.0",
-        "torchmetrics==0.5.0",
-        "scipy==1.14.0",
+        "torchmetrics==0.7.0",
+        "scipy",
         "pytorch_lightning==2.3.3",
         "verovio==4.2.1",
         "torch-scatter==2.1.2",
