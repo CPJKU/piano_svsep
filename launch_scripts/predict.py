@@ -21,11 +21,33 @@ import argparse
 
 
 def prepare_score(path_to_score, exclude_grace=True):
+    """
+    Prepare the score for voice separation.
+
+    Parameters
+    ----------
+    path_to_score: str
+        Path to the score file. Partitura can handle different formats such as musicxml, mei, etc.
+    exclude_grace: bool
+        Whether to exclude grace notes. Defaults to True.
+
+    Returns
+    -------
+        pg_graph: torch_geometric.data.HeteroData
+            PyG HeteroData object containing the score graph.
+        score: partitura.score.Score
+            Partitura Score object.
+        tie_couples: np.ndarray
+            Array of tied notes.
+    """
+    # Load the score
     score = pt.load_score(path_to_score, force_note_ids=True)
     if len(score) > 1:
         score = pt.score.Score(pt.score.merge_parts(score.parts))
+
     # Preprocess score for voice separation
     tie_couples = remove_ties_acros_barlines(score, return_ids=True)
+
     # Remove beams
     for part in score:
         beams = list(part.iter_all(pt.score.Beam))
@@ -34,6 +56,7 @@ def prepare_score(path_to_score, exclude_grace=True):
             for note in beam_notes:
                 note.beam = None
             part.remove(beam)
+
     # Remove rests
     for part in score:
         rests = list(part.iter_all(pt.score.Rest))
@@ -45,21 +68,25 @@ def prepare_score(path_to_score, exclude_grace=True):
             if isinstance(tuplet.start_note, pt.score.Rest) or isinstance(tuplet.end_note, pt.score.Rest):
                 part.remove(tuplet)
 
-    # Remove Grace_notes
+    # Remove grace notes if exclude_grace is True
     if exclude_grace:
         for part in score:
             grace_notes = list(part.iter_all(pt.score.GraceNote))
             for grace_note in grace_notes:
                 part.remove(grace_note)
 
+    # Create note array with necessary features
     note_array = score[0].note_array(
         include_time_signature=True,
         include_grace_notes=True, # this is just to check that there are not grace notes left
         include_staff=True,
     )
-    # get the measure number for each note in the note array
+
+    # Get the measure number for each note in the note array
     mn_map = score[np.array([p._quarter_durations[0] for p in score]).argmax()].measure_number_map
     note_measures = mn_map(note_array["onset_div"])
+
+    # Create heterogeneous graph from note array
     nodes, edges = hetero_graph_from_note_array(note_array, pot_edge_dist=0)
     note_features = get_vocsep_features(note_array)
     hg = HeteroScoreGraph(
@@ -69,15 +96,37 @@ def prepare_score(path_to_score, exclude_grace=True):
         labels=None,
         note_array=note_array,
     )
+
+    # Get potential edges
     pot_edges = get_measurewise_pot_edges(note_array, note_measures)
     pot_chord_edges = get_pot_chord_edges(note_array, hg.get_edges_of_type("onset").numpy())
     setattr(hg, "pot_edges", torch.tensor(pot_edges))
     setattr(hg, "pot_chord_edges", torch.tensor(pot_chord_edges))
+
+    # Convert score graph to PyG graph
     pg_graph = score_graph_to_pyg(hg)
+
     return pg_graph, score, tie_couples
 
 
 def predict_voice(path_to_model, path_to_score, save_path=None):
+    """
+    Predict the voice assignment for a given score using a pre-trained model.
+
+    Parameters
+    ----------
+    path_to_model: str
+        Path to the pre-trained model checkpoint.
+    path_to_score: str
+        Path to the score file. Partitura can handle different formats such as musicxml, mei, etc.
+    save_path: str, optional
+        Path to save the predicted score. If None, the predicted score will be saved in the same directory as the input score with '_pred' appended to the filename. Defaults to None.
+
+    Returns
+    -------
+    None
+        Updates are made to the score object and saved to the specified path.
+    """
     # Load the model
     pl_model = PLPianoSVSep.load_from_checkpoint(path_to_model, map_location="cpu")
     # Prepare the score
@@ -160,6 +209,7 @@ def correct_and_save_mei(part,save_path):
 
 
 if __name__ == "__main__":
+    # TODO: Add argparse
     basepath = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     model_path = os.path.join(basepath, "pretrained_models", "model.ckpt")
     score_path = os.path.join(basepath, "artifacts", "test_score.musicxml")

@@ -16,6 +16,7 @@ from scipy.optimize import linear_sum_assignment
 
 
 def get_pc_one_hot(part, note_array):
+    """Get one-hot encoding of pitch classes."""
     one_hot = np.zeros((len(note_array), 12))
     idx = (np.arange(len(note_array)),np.remainder(note_array["pitch"], 12))
     one_hot[idx] = 1
@@ -23,6 +24,7 @@ def get_pc_one_hot(part, note_array):
 
 
 def get_full_pitch_one_hot(part, note_array, piano_range = True):
+    """Get one-hot encoding of all pitches."""
     one_hot = np.zeros((len(note_array), 127))
     idx = (np.arange(len(note_array)),note_array["pitch"])
     one_hot[idx] = 1
@@ -32,6 +34,7 @@ def get_full_pitch_one_hot(part, note_array, piano_range = True):
 
 
 def get_octave_one_hot(part, note_array):
+    """Get one-hot encoding of octaves."""
     one_hot = np.zeros((len(note_array), 10))
     idx = (np.arange(len(note_array)), np.floor_divide(note_array["pitch"], 12))
     one_hot[idx] = 1
@@ -40,11 +43,14 @@ def get_octave_one_hot(part, note_array):
 
 def get_vocsep_features(part, return_names=False) -> Tuple[np.ndarray, List]:
     """
-    Returns features Voice Detection features.
+    Computes Voice Detection features.
 
     Parameters
     ----------
     part: structured note array or partitura score part
+        The partitura part or note array of the score.
+    return_names: bool, optional
+        Whether to return the feature names, by default False.
 
     Returns
     -------
@@ -61,30 +67,10 @@ def get_vocsep_features(part, return_names=False) -> Tuple[np.ndarray, List]:
     else:
         note_array = part.note_array(include_time_signature=True)
 
-    # octave_oh, octave_names = get_octave_one_hot(part, note_array)
-    # pc_oh, pc_names = get_pc_one_hot(part, note_array)
-    # onset_feature = np.expand_dims(np.remainder(note_array["onset_beat"], note_array["ts_beats"]) / note_array["ts_beats"], 1)
-    # on_feats, _ = pt.musicanalysis.note_features.onset_feature(note_array, part)
-    # duration_feature = np.expand_dims(np.remainder(note_array["duration_beat"], note_array["ts_beats"]) / note_array["ts_beats"], 1)
-    # # new attempt! To delete in case
-    # # duration_feature = np.expand_dims(1- (1/(1+np.exp(-3*(note_array["duration_beat"]/note_array["ts_beats"])))-0.5)*2, 1)
-    # pitch_norm = np.expand_dims(note_array["pitch"] / 127., 1)
-    # on_names = ["barnorm_onset", "piecenorm_onset"]
-    # dur_names = ["barnorm_duration"]
-    # pitch_names = ["pitchnorm"]
-    # names = on_names + dur_names + pitch_names + pc_names + octave_names
-    # out = np.hstack((onset_feature, np.expand_dims(on_feats[:, 1], 1), duration_feature, pitch_norm, pc_oh, octave_oh))
-
-    # octave_oh, octave_names = get_octave_one_hot(part, note_array)
-    # pitch_oh, pitch_names = get_full_pitch_one_hot(part, note_array)
-    # onset_feature = np.expand_dims(np.remainder(note_array["onset_beat"], note_array["ts_beats"]) / note_array["ts_beats"], 1)
-    # on_feats, _ = pt.musicanalysis.note_features.onset_feature(note_array, part)
     octave_oh, octave_names = get_octave_one_hot(part, note_array)
     pc_oh, pc_names = get_pc_one_hot(part, note_array)
-    # duration_feature = np.expand_dims(1- (1/(1+np.exp(-3*(note_array["duration_beat"]/note_array["ts_beats"])))-0.5)*2, 1)
     duration_feature = np.expand_dims(1 - np.tanh(note_array["duration_beat"]/note_array["ts_beats"]), 1)
     dur_names = ["bar_exp_duration"]
-    # on_names = ["barnorm_onset", "piecenorm_onset"]
     names = dur_names + pc_names + octave_names
     out = np.hstack((duration_feature, pc_oh, octave_oh))
     if return_names:
@@ -174,8 +160,7 @@ def get_measurewise_pot_edges(note_array, measure_notes):
         voc_inds = np.sort(np.where(measure_notes == un)[0])
         # edge indices between all pairs of notes in the same measure (without self loops). size of (2, n)
         edges = np.vstack((np.repeat(voc_inds, len(voc_inds)), np.tile(voc_inds, len(voc_inds))))
-        # # remove self loops
-        # self_loop_mask = edges[0] != edges[1]
+
         # remove edges whose end onset is before start offset
         not_after_mask = note_array["onset_div"][edges[1]] >= note_array["onset_div"][edges[0]] + \
                          note_array["duration_div"][edges[0]]
@@ -185,6 +170,9 @@ def get_measurewise_pot_edges(note_array, measure_notes):
         edges = edges[:, not_after_mask]
         pot_edges.append(edges)
     pot_edges = np.hstack(pot_edges)
+    # remove self loops
+    self_loop_mask = pot_edges[0] != pot_edges[1]
+    pot_edges = pot_edges[:, self_loop_mask]
     return pot_edges
 
 

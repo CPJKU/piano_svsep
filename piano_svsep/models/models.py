@@ -9,6 +9,9 @@ from typing import Tuple, NamedTuple
 
 
 class UnpoolInfo(NamedTuple):
+    """
+    A named tuple for storing information about the unpooling operation.
+    """
     edge_index: Tensor
     cluster: Tensor
     batch: Tensor
