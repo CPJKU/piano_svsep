@@ -16,6 +16,7 @@ setup(
         "partitura==1.5.0",
         "torchmetrics==1.4.0",
         "scipy",
+        "scikit-learn",
         "pytorch_lightning==2.3.3",
         "verovio==4.2.1",
         "torch-scatter==2.1.2",

@@ -17,9 +17,29 @@ class UnpoolInfo(NamedTuple):
     batch: Tensor
     new_edge_score: Tensor
 
+
 class ChordPredictor(torch.nn.Module):
     """
-    This code predict chord edges from the node embeddings.
+    A module for predicting chord edges from node embeddings.
+
+    This class supports multiple pooling modes for chord prediction, including:
+    - MLP
+    - Dot Product
+    - Cosine Similarity
+
+    Attributes
+    ----------
+    in_channels : int
+        Number of input channels.
+    pooling_mode : str
+        Pooling mode to use for chord prediction.
+    dropout : float, optional
+        Dropout rate (default is 0.0).
+
+    Methods
+    -------
+    forward(x, edge_index, batch)
+        Forward pass for chord prediction.
     """
     def __init__(
         self,
@@ -76,7 +96,6 @@ class ChordPredictor(torch.nn.Module):
         return f'{self.__class__.__name__}({self.in_channels})'
 
 
-
 class SageEncoder(nn.Module):
     def __init__(self, hidden_features, num_layers, activation, dropout):
         super().__init__()
@@ -121,6 +140,47 @@ class HSageEncoder(nn.Module):
 
 
 class PianoSVSep(nn.Module):
+    """
+    A neural network module for piano staff and voice separation.
+
+    This class implements a graph neural network (GNN) model for separating notes in a piano score into different voices and staves.
+
+    Attributes
+    ----------
+    input_features : int
+        Number of input features.
+    hidden_features : int
+        Number of hidden features.
+    num_layers : int
+        Number of layers in the encoder.
+    activation : callable
+        Activation function to use.
+    dropout : float
+        Dropout rate.
+    conv_type : str
+        Type of convolution to use in the encoder.
+    gnn_metadata : tuple
+        Metadata for the heterogeneous graph.
+    chord_pooling_mode : str
+        Pooling mode for chord prediction.
+    after_encoder_frontend : bool
+        Whether to use a linear layer after the encoder.
+    edge_feature_feedback : bool
+        Whether to use edge feature feedback.
+    staff_feedback : bool
+        Whether to use staff feedback.
+    pooling_layer : nn.Module or None
+        Pooling layer for chord prediction.
+    staff_clf : nn.Sequential
+        Classifier for staff prediction.
+
+    Methods
+    -------
+    forward(x_dict, edge_index_dict, pot_edges, pot_chord_edges, batch, onsets, durations, pitches, onset_beat, duration_beat, ts_beats, edge_attr_dict=None)
+        Forward pass of the model.
+    _init_weights(module)
+        Initialize the weights of the model.
+    """
     def __init__(self, input_features, hidden_features, num_layers, activation=F.relu, dropout=0.5,
                 conv_type="SageConv", gnn_metadata=None, chord_pooling_mode="none", after_encoder_frontend = False, **kwargs):
         super().__init__()
@@ -151,6 +211,47 @@ class PianoSVSep(nn.Module):
         self.apply(self._init_weights)
 
     def forward(self, x_dict, edge_index_dict, pot_edges, pot_chord_edges, batch, onsets, durations, pitches, onset_beat, duration_beat, ts_beats, edge_attr_dict=None):
+        """
+        Forward pass of the model.
+
+        Parameters
+        ----------
+        x_dict : dict
+            Dictionary of node feature tensors.
+        edge_index_dict : dict
+            Dictionary of edge indices.
+        pot_edges : Tensor
+            Potential edges between nodes.
+        pot_chord_edges : Tensor
+            Potential chord edges between nodes.
+        batch : Tensor
+            Batch indices.
+        onsets : Tensor
+            Onset times of the notes.
+        durations : Tensor
+            Durations of the notes.
+        pitches : Tensor
+            Pitches of the notes.
+        onset_beat : Tensor
+            Onset times in beats.
+        duration_beat : Tensor
+            Durations in beats.
+        ts_beats : Tensor
+            Time signature beats.
+        edge_attr_dict : dict, optional
+            Dictionary of edge attributes (default is None).
+
+        Returns
+        -------
+        out : Tensor
+            Output tensor.
+        staff_logits : Tensor
+            Staff prediction logits.
+        hidden_features : Tensor
+            Hidden features of the nodes.
+        pooling_logits : Tensor
+            Chord pooling logits.
+        """
         z_dict = self.encoder(x_dict, edge_index_dict, edge_attr_dict)
         hidden_features = z_dict["note"]
         hidden_features = self.after_encoder_frontend(hidden_features)
@@ -180,48 +281,146 @@ class PianoSVSep(nn.Module):
 
 
 class EdgeDecoder(torch.nn.Module):
-	def __init__(self, hidden_channels, mult_factor=1, staff_feedback=False, dropout=0.5):
-		super().__init__()
-		self.staff_feedback = staff_feedback
-		input_dim = 2 * hidden_channels*mult_factor+3
-		input_dim = input_dim + 4 if staff_feedback else input_dim
-		self.dropout = nn.Dropout(dropout)
-		self.normalize = nn.LayerNorm(hidden_channels)
-		self.lin1 = torch.nn.Linear(input_dim, hidden_channels)
-		self.lin2 = torch.nn.Linear(hidden_channels, 1)
+    """
+    A decoder class for predicting edges (connections) between nodes in a graph.
+    This class uses various features such as onset, duration, and pitch to predict
+    the likelihood of edges between nodes.
+    """
+    def __init__(self, hidden_channels, mult_factor=1, staff_feedback=False, dropout=0.5):
+        """
+        Initialize the EdgeDecoder.
 
-	def forward(self, hidden_features, pot_edges, onsets, durations, pitches, onset_beat, duration_beat, ts_beats, staff_pred=None):
-		row, col = pot_edges
-		# z = torch.cat([z_dict['note'][row], z_dict['note'][col]], dim=-1)
-		# one_hot_encode_note_distance =self.one_hot_encode_note_distance(onsets[col] - offsets[row]).unsqueeze(1)
-		# onset_score = self.onset_score(edge_label_index, onsets, durations).unsqueeze(1)
-		oscore = self.onset_score(pot_edges, onsets, durations, onset_beat, duration_beat, ts_beats)
-		pscore = self.pitch_score(pot_edges, pitches)
-		# z = torch.cat([z_dict['note'][row], z_dict['note'][col], one_hot_encode_note_distance, onset_score ], dim=-1)
-		hidden_features = torch.cat([hidden_features, staff_pred], dim=-1) if self.staff_feedback else hidden_features
-		z = torch.cat([hidden_features[row], hidden_features[col], oscore, pscore], dim=-1)
-		
-		z = self.lin1(z).relu()
-		z = self.normalize(self.dropout(z))
-		z = self.lin2(z)
-		return z.view(-1)
+        Parameters
+        ----------
+        hidden_channels : int
+            Number of hidden channels.
+        mult_factor : int, optional
+            Multiplication factor for hidden channels (default is 1).
+        staff_feedback : bool, optional
+            Whether to use staff feedback (default is False).
+        dropout : float, optional
+            Dropout rate (default is 0.5).
+        """
+        super().__init__()
+        self.staff_feedback = staff_feedback
+        input_dim = 2 * hidden_channels*mult_factor+3
+        input_dim = input_dim + 4 if staff_feedback else input_dim
+        self.dropout = nn.Dropout(dropout)
+        self.normalize = nn.LayerNorm(hidden_channels)
+        self.lin1 = torch.nn.Linear(input_dim, hidden_channels)
+        self.lin2 = torch.nn.Linear(hidden_channels, 1)
 
-	def one_hot_encode_note_distance(self,distance):
-		out = distance == 0
-		return out.float()
+    def forward(self, hidden_features, pot_edges, onsets, durations, pitches, onset_beat, duration_beat, ts_beats, staff_pred=None):
 
-	def pitch_score(self, edge_index, mpitch):
-		"""Pitch score from midi to freq."""
-		pscore = torch.abs(mpitch[edge_index[1]]- mpitch[edge_index[0]])/127
-		return pscore.unsqueeze(1)
+        """
+        Forward pass for the EdgeDecoder.
 
-	def onset_score(self, edge_index, onset, duration, onset_beat, duration_beat, ts_beats):
-		offset = onset + duration
-		offset_beat = onset_beat + duration_beat
-		note_distance_beat = onset_beat[edge_index[1]] - offset_beat[edge_index[0]]
-		ts_beats_edges = ts_beats[edge_index[1]]
-		# oscore = 1- (1/(1+torch.exp(-2*(note_distance_beat/ts_beats_edges)))-0.5)*2
-		oscore = 1 - torch.tanh(note_distance_beat / ts_beats_edges)
-		one_hot_pitch_score = (onset[edge_index[1]] == offset[edge_index[0]]).float()
-		oscore = torch.cat((oscore.unsqueeze(1), one_hot_pitch_score.unsqueeze(1)), dim=1)
-		return oscore
+        Parameters
+        ----------
+        hidden_features : Tensor
+            Hidden features of the nodes.
+        pot_edges : Tensor
+            Potential edges between nodes.
+        onsets : Tensor
+            Onset times of the notes.
+        durations : Tensor
+            Durations of the notes.
+        pitches : Tensor
+            Pitches of the notes.
+        onset_beat : Tensor
+            Onset times in beats.
+        duration_beat : Tensor
+            Durations in beats.
+        ts_beats : Tensor
+            Time signature beats.
+        staff_pred : Tensor, optional
+            Staff predictions (default is None).
+
+        Returns
+        -------
+        Tensor
+            Predicted edge scores.
+        """
+
+        row, col = pot_edges
+        oscore = self.onset_score(pot_edges, onsets, durations, onset_beat, duration_beat, ts_beats)
+        pscore = self.pitch_score(pot_edges, pitches)
+        hidden_features = torch.cat([hidden_features, staff_pred], dim=-1) if self.staff_feedback else hidden_features
+        z = torch.cat([hidden_features[row], hidden_features[col], oscore, pscore], dim=-1)
+
+        z = self.lin1(z).relu()
+        z = self.normalize(self.dropout(z))
+        z = self.lin2(z)
+        return z.view(-1)
+
+    def one_hot_encode_note_distance(self,distance):
+        """
+        One-hot encode the note distance.
+
+        Parameters
+        ----------
+        distance : Tensor
+            Distance between notes.
+
+        Returns
+        -------
+        Tensor
+            One-hot encoded distance.
+        """
+        out = distance == 0
+        return out.float()
+
+    def pitch_score(self, edge_index, mpitch):
+        """
+        Calculate the pitch score from MIDI to frequency.
+        Pairs of notes with similar pitches are more likely to be connected.
+
+        Parameters
+        ----------
+        edge_index: Tensor
+            Edge indices.
+        mpitch: Tensor
+            MIDI pitches.
+
+        Returns
+        -------
+            pscore: Tensor
+                The Pitch scores between the notes.
+        """
+        pscore = torch.abs(mpitch[edge_index[1]]- mpitch[edge_index[0]])/127
+        return pscore.unsqueeze(1)
+
+    def onset_score(self, edge_index, onset, duration, onset_beat, duration_beat, ts_beats):
+        """
+        Calculate the onset score between notes.
+        Pairs of notes with similar onset times are more likely to be connected.
+
+        Parameters
+        ----------
+        edge_index : Tensor
+            Edge indices.
+        onset : Tensor
+            Onset times.
+        duration : Tensor
+            Durations.
+        onset_beat : Tensor
+            Onset times in beats.
+        duration_beat : Tensor
+            Durations in beats.
+        ts_beats : Tensor
+            Time signature beats.
+
+        Returns
+        -------
+        Tensor
+            Onset scores.
+        """
+        offset = onset + duration
+        offset_beat = onset_beat + duration_beat
+        note_distance_beat = onset_beat[edge_index[1]] - offset_beat[edge_index[0]]
+        ts_beats_edges = ts_beats[edge_index[1]]
+        # oscore = 1- (1/(1+torch.exp(-2*(note_distance_beat/ts_beats_edges)))-0.5)*2
+        oscore = 1 - torch.tanh(note_distance_beat / ts_beats_edges)
+        one_hot_pitch_score = (onset[edge_index[1]] == offset[edge_index[0]]).float()
+        oscore = torch.cat((oscore.unsqueeze(1), one_hot_pitch_score.unsqueeze(1)), dim=1)
+        return oscore
