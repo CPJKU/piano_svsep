@@ -3,9 +3,35 @@ import numpy as np
 from torch_geometric.loader import DataLoader as PygDataLoader
 import torch
 from piano_svsep.data.utils import idx_tuple_to_dict, idx_dict_to_tuple
+from piano_svsep.data.dataset import DCMLPianoCorporaPolyVoiceSeparationDataset, MusescorePopPolyVoiceSeparationDataset
+from pytorch_lightning import LightningDataModule
 
 
 class GraphPolyphonicVoiceSeparationDataModule(LightningDataModule):
+    """
+    A PyTorch Lightning DataModule for polyphonic voice separation using graph-based datasets.
+
+    Attributes
+    ----------
+    batch_size : int
+        The size of the batches.
+    num_workers : int
+        The number of workers for data loading.
+    force_reload : bool
+        Whether to force reload the datasets.
+    test_collections : list
+        List of test collections.
+    subgraph_size : int
+        The size of the subgraphs.
+    verbose : bool
+        Whether to print verbose output.
+    raw_dir : str, optional
+        Directory for raw data (defaults to ~/.piano_svsep_data when None).
+    randomize_test : bool
+        Whether to randomize the test collections.
+
+    """
+
     def __init__(
             self, batch_size=50, num_workers=4, force_reload=False, test_collections=None, subgraph_size=500, verbose=False,
             raw_dir=None, randomize_test=False
@@ -33,6 +59,9 @@ class GraphPolyphonicVoiceSeparationDataModule(LightningDataModule):
         pass
 
     def setup(self, stage=None):
+        """
+        Sets up the datasets and splits them into training, validation, and test sets.
+        """
         self.datasets_map = [(dataset_i, piece_i) for dataset_i, dataset in enumerate(self.datasets) for piece_i in
                              range(len(dataset))]
         idxs = np.arange(len(self.datasets_map))
@@ -59,7 +88,7 @@ class GraphPolyphonicVoiceSeparationDataModule(LightningDataModule):
                 test_idx = np.array(idx_dict[k])[test_mask]
                 self.test_idx_dict[k] = test_idx
                 trainval_idx_dict[k] = np.array(idx_dict[k])[~test_mask]
-            # exlude other test sets
+            # exclude other test sets
             for k, v in idx_tuple_to_dict(idxs[~collections_mask], self.datasets_map).items():
                 dataset_test_pieces = np.array(self.datasets[k].test_files)
                 graphs = self.datasets[k].graphs
@@ -90,6 +119,13 @@ class GraphPolyphonicVoiceSeparationDataModule(LightningDataModule):
         )
 
     def train_dataloader(self):
+        """
+        Creates the DataLoader for the training set.
+
+        Returns
+        -------
+        DataLoader: The DataLoader for the training set.
+        """
         print(f"Creating train dataloader with subgraph size {self.subgraph_size} and batch size {self.batch_size}")
         # compute training graphs here to change the graphs that exceed max size.
         training_graphs = [graph[0] for k in self.train_idx_dict.keys() for graph in self.datasets[k][self.train_idx_dict[k]] ]
@@ -115,16 +151,38 @@ class GraphPolyphonicVoiceSeparationDataModule(LightningDataModule):
 
 
     def val_dataloader(self):
+        """
+        Creates the Graph DataLoader for the validation set.
+
+        Returns
+        -------
+        DataLoader: The DataLoader for the validation set.
+        """
         dataset_val = sum([self.datasets[k][self.val_idx_dict[k]] for k in self.val_idx_dict.keys()], [])
         return PygDataLoader(
             dataset_val, batch_size=1, num_workers=0
         )
 
     def test_dataloader(self):
+        """
+        Creates the Graph DataLoader for the test set.
+
+        Returns
+        -------
+        DataLoader: The DataLoader for the test set.
+        """
         dataset_test = sum([self.datasets[k][self.test_idx_dict[k]] for k in self.test_idx_dict.keys()], [])
         return PygDataLoader(
             dataset_test, batch_size=1, num_workers=0
         )
 
     def predict_dataloader(self):
+        """
+        Creates the DataLoader for the prediction set.
+
+
+        Returns
+        -------
+        DataLoader: The DataLoader for the prediction set same as the test set.
+        """
         return self.test_dataloader()

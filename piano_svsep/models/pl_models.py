@@ -36,6 +36,42 @@ class AlgorithmicVoiceSeparationModel(LightningModule):
 
 
 class PLPianoSVSep(LightningModule):
+    """
+    PyTorch Lightning Module for Piano Symbolic Voice Separation.
+
+    Parameters
+    ----------
+    in_feats : int
+        Number of input features.
+    n_hidden : int
+        Number of hidden units.
+    n_layers : int, optional
+        Number of layers in the GNN, by default 2.
+    activation : callable, optional
+        Activation function, by default F.relu.
+    dropout : float, optional
+        Dropout rate, by default 0.5.
+    lr : float, optional
+        Learning rate, by default 0.001.
+    weight_decay : float, optional
+        Weight decay for the optimizer, by default 5e-4.
+    rev_edges : str, optional
+        Type of reverse edges to add, by default "new_type".
+    pos_weights : dict, optional
+        Positive weights for loss functions, by default None.
+    conv_type : str, optional
+        Type of convolution layer, by default "SAGEConv".
+    chord_pooling_mode : str, optional
+        Mode for chord pooling, by default "none".
+    feat_norm_scale : float, optional
+        Scale for feature normalization loss, by default 0.1.
+    staff_feedback : bool, optional
+        Whether to use staff feedback, by default False.
+    edge_feature_feedback : bool, optional
+        Whether to use edge feature feedback, by default False.
+    after_encoder_frontend : bool, optional
+        Whether to use a frontend after the encoder, by default False.
+    """
     def __init__(
             self,
             in_feats,
@@ -88,8 +124,24 @@ class PLPianoSVSep(LightningModule):
         self.voice_acc = Accuracy(task="binary")
 
     def _common_step(self, graph, step_type="train", **kwargs):
+        """
+        Common step for training, validation, and testing.
+
+        Parameters
+        ----------
+        graph : torch_geometric.data.HeteroData
+            Input graph data with potential and truth edges.
+            These edges are used as ground truth for training.
+        step_type : str, optional
+            Type of step, by default "train".
+
+        Returns
+        -------
+        loss : torch.Tensor
+            Computed loss.
+        """
         if self.rev_edges is not None:
-            add_reverse_edges(graph, mode=self.rev_edges)
+            add_reverse_edges(graph, mode=self.rev_edges)  # Add reverse edges to the graph if specified
 
         gbatch = graph["note"].batch
         edge_index_dict = graph.edge_index_dict
@@ -165,11 +217,36 @@ class PLPianoSVSep(LightningModule):
         return loss, pooling_mask_logits, pot_chord_edges, truth_chord_edges
 
     def training_step(self, batch, batch_idx, **kwargs):
+        """
+        Training step.
+
+        Parameters
+        ----------
+        batch : dict
+            Input batch data.
+        batch_idx : int
+            Batch index.
+
+        Returns
+        -------
+        loss : torch.Tensor
+            Computed loss.
+        """
         graph = batch
         loss = self._common_step(graph, step_type="train", **kwargs)
         return loss
 
     def validation_step(self, batch, batch_idx, **kwargs):
+        """
+        Validation step.
+
+        Parameters
+        ----------
+        batch : dict
+            Input batch data.
+        batch_idx : int
+            Batch index.
+        """
         graph = batch[0]
         loss, pooling_mask_logits, pot_chord_edges, truth_chord_edges = self._common_step(graph, step_type="val", **kwargs)
         if self.chord_pooling_mode != "none":
@@ -178,6 +255,16 @@ class PLPianoSVSep(LightningModule):
             self.log("val_chord_f1", self.chord_f1(pooling_mask_prob, truth_pooling_mask.long()), on_step=False, on_epoch=True, prog_bar=False, batch_size=1)
 
     def test_step(self, batch, batch_idx, **kwargs):
+        """
+        Test step.
+
+        Parameters
+        ----------
+        batch : dict
+            Input batch data.
+        batch_idx : int
+            Batch index.
+        """
         graph = batch[0]
         loss, pooling_mask_logits, pot_chord_edges, truth_chord_edges = self._common_step(
             graph, step_type="test", **kwargs)
@@ -188,6 +275,21 @@ class PLPianoSVSep(LightningModule):
                      on_step=False, on_epoch=True, prog_bar=False, batch_size=1)
 
     def predict_step(self, graph, **kwargs):
+        """
+        Prediction step.
+
+        Parameters
+        ----------
+        graph : dict
+            Input graph data.
+
+        Returns
+        -------
+        post_pred_edges : torch.Tensor
+            Predicted edges.
+        staff_pred_logits : torch.Tensor
+            Predicted staff logits.
+        """
         if self.rev_edges is not None:
             add_reverse_edges(graph, mode=self.rev_edges)
         edge_index_dict = graph.edge_index_dict
@@ -230,6 +332,21 @@ class PLPianoSVSep(LightningModule):
         return post_pred_edges, staff_pred_logits.argmax(dim=1).long()
 
     def create_edge_attr(self, na, edge_index_dict):
+        """
+        Create edge attributes.
+
+        Parameters
+        ----------
+        na : torch.Tensor
+            Node attributes.
+        edge_index_dict : dict
+            Edge index dictionary.
+
+        Returns
+        -------
+        edge_attr_dict : dict
+            Edge attribute dictionary.
+        """
         edge_attr_dict = {}
         for key, value in edge_index_dict.items():
             new_v = na[value[0]] - na[value[1]]
@@ -241,11 +358,7 @@ class PLPianoSVSep(LightningModule):
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.weight_decay, eps=1e-4)
-        # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min")
-        # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, 50, verbose=False)
         return {
             "optimizer": optimizer,
-            # "lr_scheduler": scheduler,
-            # "monitor": "val_loss"
         }
 

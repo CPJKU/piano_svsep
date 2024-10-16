@@ -269,43 +269,57 @@ class BuiltinDataset(BaseDataset):
             raise ValueError("Unknown url: {}".format(self.url))
 
 
-
-class DCMLPianoCorporaDataset(BuiltinDataset):
-    def __init__(self, raw_dir=None, force_reload=False,
-                 verbose=True):
-        url = "https://github.com/fosfrancesco/piano_corpora_dcml.git"
-        super(DCMLPianoCorporaDataset, self).__init__(
-            name="DCMLPianoCorporaDataset",
-            url=url,
-            raw_dir=raw_dir,
-            force_reload=force_reload,
-            verbose=verbose,
-            is_zip=False)
-        self.scores = []
-        self.collections = []
-        self.composers = []
-        self.period = "Unknown"
-        self.type = []
-        self.process()
-
-    def process(self):
-        self.scores = []
-        self.collections = []
-        for fn in os.listdir(os.path.join(self.save_path, "scores")):
-            for score_fn in os.listdir(os.path.join(self.save_path, "scores", fn)):
-                if score_fn.endswith(".musicxml"):
-                    self.scores.append(os.path.join(self.save_path, "scores", fn, score_fn))
-                    self.collections.append("dcml")
-                    self.composers.append(fn.split("_")[0])
-                    self.type.append("_".join(fn.split("_")[1:]))
-
-    def has_cache(self):
-        if os.path.exists(self.save_path):
-            return True
-        return False
-
-
 class GraphPolyphonicVoiceSeparationDataset(BaseDataset):
+    """
+    A dataset class for polyphonic voice separation using graph representations.
+
+    Parameters
+    ----------
+    dataset_base : BaseDataset
+        The base dataset to be processed.
+    is_pyg : bool, optional
+        Whether to use PyTorch Geometric (default is True).
+    raw_dir : str, optional
+        Directory to store the raw data (default is None).
+    force_reload : bool, optional
+        Whether to force reload the dataset (default is False).
+    verbose : bool, optional
+        Whether to print progress information (default is True).
+    nprocs : int, optional
+        Number of processes to use for parallel processing (default is 4).
+    include_measures : bool, optional
+        Whether to include measures in the dataset (default is False).
+    max_size : int, optional
+        Maximum size of the dataset (default is 500).
+    subsample_size : int, optional
+        Size of the subsample (default is 200).
+    prob_pieces : list, optional
+        List of problematic pieces to exclude (default is an empty list).
+
+    Attributes
+    ----------
+    dataset_base : BaseDataset
+        The base dataset being processed, this should contain the scores.
+    prob_pieces : list
+        List of problematic pieces to exclude, if any.
+    max_size : int
+        Maximum size of the generated graphs within the dataset.
+    stage : str
+        Current stage of the dataset (default is "validate").
+    graphs : list
+        List of processed graphs.
+    n_jobs : int
+        Number of processes to use for parallel processing.
+    dropped_notes : int
+        Number of dropped notes during processing.
+    is_pyg : bool
+        Whether to use PyTorch Geometric.
+    _force_reload : bool
+        Whether to force reload the dataset.
+    include_measures : bool
+        Whether to include measures in the dataset.
+    """
+
     def __init__(
             self, dataset_base, is_pyg=True, raw_dir=None, force_reload=False, verbose=True, nprocs=4, include_measures=False, max_size=500, subsample_size=200, prob_pieces=[]
     ):
@@ -331,6 +345,9 @@ class GraphPolyphonicVoiceSeparationDataset(BaseDataset):
         )
 
     def process(self):
+        """
+        Process the dataset by creating graphs from the base dataset scores.
+        """
         if not os.path.exists(self.save_path):
             os.makedirs(self.save_path)
         Parallel(n_jobs=self.n_jobs)(
@@ -342,6 +359,14 @@ class GraphPolyphonicVoiceSeparationDataset(BaseDataset):
         self.load()
 
     def has_cache(self):
+        """
+        Check if the dataset has a cache.
+
+        Returns
+        -------
+        bool
+            True if the dataset has a cache, False otherwise.
+        """
         if self.is_pyg:
             if all(
                     [os.path.exists(os.path.join(self.save_path, os.path.splitext(os.path.basename(path))[0] + ".pt" ,))
@@ -357,12 +382,27 @@ class GraphPolyphonicVoiceSeparationDataset(BaseDataset):
         return False
 
     def load(self):
+        """
+        Load the processed graphs from the save path.
+        """
         for fn in os.listdir(self.save_path):
             path_graph = os.path.join(self.save_path, fn)
             graph = torch.load(path_graph)
             self.graphs.append(graph)
 
     def _process_score(self, score_fn, collection):
+        """
+        Process a single score file and create a graph.
+
+        This function processes a single score file and creates a graph from it. The graph is then saved to the save path.
+
+        Parameters
+        ----------
+        score_fn : str
+            Path to the score file.
+        collection : str
+            Collection name of the score.
+        """
         parent_name = os.path.basename(os.path.dirname(score_fn))
         name = os.path.splitext(os.path.basename(score_fn))[0]
         name = f"{parent_name}_{name}" if parent_name != "musicxml" else name
@@ -427,43 +467,180 @@ class GraphPolyphonicVoiceSeparationDataset(BaseDataset):
         return
 
     def set_split(self, stage):
+        """
+        Set the current stage of the dataset.
+
+        Parameters
+        ----------
+        stage : str
+            The stage to set (e.g., "train", "validate", "test").
+        """
         self.stage = stage
 
     def __getitem__(self, idx):
+        """
+        Get the data object at the specified index.
+
+        Parameters
+        ----------
+        idx : int
+            Index of the data object to retrieve.
+
+        Returns
+        -------
+        list
+            The data object at the specified index.
+        """
         if self.is_pyg:
             return [[self.graphs[i]] for i in idx]
         else:
             raise Exception("You should be using pytorch geometric.")
 
     def __len__(self):
+        """
+        Get the number of examples in the dataset.
+
+        Returns
+        -------
+        int
+            The number of examples in the dataset.
+        """
         return len(self.graphs)
 
     @property
     def features(self):
+        """
+        Get the number of features in the dataset.
+
+        Returns
+        -------
+        int
+            The number of features in the dataset.
+        """
         return self.graphs[0]["note"].x.shape[-1]
 
     @property
     def metadata(self):
+        """
+        Get the metadata of the dataset.
+
+        Returns
+        -------
+        dict
+            The metadata of the dataset.
+        """
         return self.graphs[0].metadata()
 
     def num_dropped_truth_edges(self):
+        """
+        Get the number of dropped truth edges in the dataset.
+
+        Returns
+        -------
+        int
+            The number of dropped truth edges.
+        """
         return sum([len(graph["dropped_truth_edges"]) for graph in self.graphs])
 
     def get_positive_weight(self):
+        """
+        Get the ratio between potential edges and real edges.
+
+        Returns
+        -------
+        float
+            The ratio between potential edges and real edges.
+        """
         return sum \
             ([g["note" ,"potential" ,"note"].edge_index.shape[1 ] /g["note" ,"truth" ,"note"].edge_index.shape[1] for g in self.graphs] ) /len(self.graphs)
 
     def get_positive_weight_chord(self):
+        """
+        Get the ratio between potential chord edges and real chord edges.
+
+        Returns
+        -------
+        float
+            The ratio between potential chord edges and real chord edges.
+        """
         return sum([g["note" ,"chord_potential" ,"note"].edge_index.shape[1 ] /max
             (g["note" ,"chord_truth" ,"note"].edge_index.shape[1] ,1) for g in self.graphs] ) /len(self.graphs)
 
 
+class DCMLPianoCorporaDataset(BuiltinDataset):
+    """
+    A dataset class for the DCML Piano Corpora.
+
+    Parameters
+    ----------
+    raw_dir : str, optional
+        Directory to store the raw data (default is None).
+    force_reload : bool, optional
+        Whether to force reload the dataset (default is False).
+    verbose : bool, optional
+        Whether to print progress information (default is True).
+    """
+    def __init__(self, raw_dir=None, force_reload=False, verbose=True):
+        url = "https://github.com/fosfrancesco/piano_corpora_dcml.git"
+        super(DCMLPianoCorporaDataset, self).__init__(
+            name="DCMLPianoCorporaDataset",
+            url=url,
+            raw_dir=raw_dir,
+            force_reload=force_reload,
+            verbose=verbose,
+            is_zip=False)
+        self.scores = []
+        self.collections = []
+        self.composers = []
+        self.period = "Unknown"
+        self.type = []
+        self.process()
+
+    def process(self):
+        """
+        Process the dataset by loading scores and collections.
+        """
+        self.scores = []
+        self.collections = []
+        for fn in os.listdir(os.path.join(self.save_path, "scores")):
+            for score_fn in os.listdir(os.path.join(self.save_path, "scores", fn)):
+                if score_fn.endswith(".musicxml"):
+                    self.scores.append(os.path.join(self.save_path, "scores", fn, score_fn))
+                    self.collections.append("dcml")
+                    self.composers.append(fn.split("_")[0])
+                    self.type.append("_".join(fn.split("_")[1:]))
+
+    def has_cache(self):
+        """
+        Check if the dataset has a cache.
+
+        Returns
+        -------
+        bool
+            True if the dataset has a cache, False otherwise.
+        """
+        if os.path.exists(self.save_path):
+            return True
+        return False
+
 
 class MusescorePopDataset(BuiltinDataset):
-    def __init__(self, raw_dir=None, force_reload=False,
-                 verbose=True):
+    """
+    A dataset class for the Musescore Pop dataset.
+
+    Parameters
+    ----------
+    raw_dir : str, optional
+        Directory to store the raw data (default is None).
+    force_reload : bool, optional
+        Whether to force reload the dataset (default is False).
+    verbose : bool, optional
+        Whether to print progress information (default is True).
+    """
+    def __init__(self, raw_dir=None, force_reload=False, verbose=True):
         url = ""
-        raise NotImplementedError("The MusescorePopDataset is private and not available for download. Please contact the authors for access.")
+        raise NotImplementedError("The MusescorePopDataset is private and not available for download. "
+                                  "Please contact the authors for access.")
         super(MusescorePopDataset, self).__init__(
             name="MusescorePopDataset",
             url=url,
@@ -479,6 +656,9 @@ class MusescorePopDataset(BuiltinDataset):
         self.process()
 
     def process(self):
+        """
+        Process the dataset by loading scores and collections.
+        """
         self.scores = []
         self.collections = []
         for score_fn in os.listdir(os.path.join(self.save_path, "musicxml")):
@@ -487,12 +667,36 @@ class MusescorePopDataset(BuiltinDataset):
                 self.collections.append("musescore_pop")
 
     def has_cache(self):
+        """
+        Check if the dataset has a cache.
+
+        Returns
+        -------
+        bool
+            True if the dataset has a cache, False otherwise.
+        """
         if os.path.exists(self.save_path):
             return True
         return False
 
 
 class DCMLPianoCorporaPolyVoiceSeparationDataset(GraphPolyphonicVoiceSeparationDataset):
+    """
+    A dataset class for polyphonic voice separation using the DCML Piano Corpora dataset.
+
+    Parameters
+    ----------
+    raw_dir : str, optional
+        Directory to store the raw data (default is None).
+    force_reload : bool, optional
+        Whether to force reload the dataset (default is False).
+    verbose : bool, optional
+        Whether to print progress information (default is True).
+    nprocs : int, optional
+        Number of processes to use for data loading (default is 4).
+    max_size : int, optional
+        Maximum size of the dataset (default is 5000).
+    """
     def __init__(self, raw_dir=None, force_reload=False, verbose=True, nprocs=4, max_size=5000):
         dataset_base = DCMLPianoCorporaDataset(raw_dir=raw_dir, force_reload=force_reload, verbose=verbose)
         # These pieces have 3 staves. We discard them for now.
@@ -540,6 +744,22 @@ class DCMLPianoCorporaPolyVoiceSeparationDataset(GraphPolyphonicVoiceSeparationD
 
 
 class MusescorePopPolyVoiceSeparationDataset(GraphPolyphonicVoiceSeparationDataset):
+    """
+    A dataset class for polyphonic voice separation using the Musescore Pop dataset.
+
+    Parameters
+    ----------
+    raw_dir : str, optional
+        Directory to store the raw data (default is None).
+    force_reload : bool, optional
+        Whether to force reload the dataset (default is False).
+    verbose : bool, optional
+        Whether to print progress information (default is True).
+    nprocs : int, optional
+        Number of processes to use for data loading (default is 4).
+    max_size : int, optional
+        Maximum size of the dataset (default is 5000).
+    """
     def __init__(self, raw_dir=None, force_reload=False, verbose=True, nprocs=4, max_size=5000):
         dataset_base = MusescorePopDataset(raw_dir=raw_dir, force_reload=force_reload, verbose=verbose)
         prob_pieces = ['0858', '0749', '0634', '0654', '0362', '0409', '0517', '0461', '0404', '0850', '0339', '0595', '0822', '0471', '0431', '0643']
