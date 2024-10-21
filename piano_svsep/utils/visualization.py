@@ -10,21 +10,21 @@ def save_pyg_graph_as_json(graph, ids, path="./"):
         ids (list): the ids of the nodes
         path (str, optional): the path to save the file. Defaults to "./".
     """
-    out_dict = {}
-    # for k,v in graph.__dict__.items():
-    #     if isinstance(v, (np.ndarray,torch.Tensor)):
-    #         out_dict[k] = v.tolist()
-    #     elif isinstance(v, str):
-    #         out_dict[k] = v
-    # export the input edges
-    for k,v in graph.edge_index_dict.items():
-        out_dict[k[1]] = v.tolist()
 
-    # export the output edges
-    # truth edges
-    # out_dict["output_edges_dict"]["truth"] = graph["truth_edges"].tolist()
-    # # potential edges
-    # out_dict["output_edges_dict"]["potential"] = graph["pot_edges"].tolist()
+    # some renaming for better readability
+    # it will become useless when the graph edge types will be updated
+    renaming_dict = {'potential':'voice_candidate',
+                    'chord_potential':'chord_candidate',	
+                    'truth':'voice_truth',
+                    'chord_truth':'chord_truth',
+                    'predicted':'voice_output',
+                    'chord_predicted':'chord_output'
+                    }
+
+    out_dict = {}
+    for k,v in graph.edge_index_dict.items():
+        new_k = renaming_dict[k[1]] if k[1] in renaming_dict else k[1]
+        out_dict[new_k] = v.tolist()
 
     # export the nodes ids
     if "_" in ids[0]: # MEI with multiple parts, remove the Pxx_ prefix
