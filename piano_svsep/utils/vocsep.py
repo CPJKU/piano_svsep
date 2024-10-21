@@ -470,33 +470,6 @@ def assign_voices(part, predicted_voice_edges: torch.LongTensor, predicted_staff
         voice_end = np.zeros(len(unique_new_voices))
         staff_for_grouping = np.zeros(len(unique_new_voices))
 
-        for i in range(len(unique_new_voices)):
-            vidxs = np.where(note_array_seg["voice"] == unique_new_voices[i])[0]
-            voice_start[i] = note_array_seg["onset_div"][vidxs].min()
-            voice_end[i] = note_array_ends[vidxs].max()
-            staff_of_voice = note_array_seg["staff"][vidxs]
-            # if there are more than one staff in the voice, assign the staff number to -1
-            if len(np.unique(staff_of_voice)) > 1:
-                staff_for_grouping[i] = -1
-            else:
-                staff_for_grouping[i] = staff_of_voice[0]
-
-        # if for any two voices, voice_end - voice_start > 0, then the voices could be merged
-        # if the staff of the two voices are the same
-        for i in range(len(unique_new_voices)):
-            for j in range(len(unique_new_voices)):
-                if i == j:
-                    continue
-                if staff_for_grouping[i] == -1 or staff_for_grouping[j] == -1:
-                    continue
-                if staff_for_grouping[i] != staff_for_grouping[j]:
-                    continue
-                if voice_end[i] <= voice_start[j]:
-                    # merge the two voices
-                    note_array_seg["voice"][np.where(note_array_seg["voice"] == unique_new_voices[j])[0]] = unique_new_voices[i]
-                    voice_end[i] = voice_end[j]
-                    voice_start[j] = voice_start[i]
-
         voices_per_measure = note_array_seg["voice"]
 
         # group note_array_seg by voice and get the mean of the pitches
