@@ -20,7 +20,7 @@ from lxml import etree
 import argparse
 
 
-def prepare_score(path_to_score, exclude_grace=True):
+def prepare_score(path_to_score):
     """
     Prepare the score for voice separation.
 
@@ -68,12 +68,11 @@ def prepare_score(path_to_score, exclude_grace=True):
             if isinstance(tuplet.start_note, pt.score.Rest) or isinstance(tuplet.end_note, pt.score.Rest):
                 part.remove(tuplet)
 
-    # Remove grace notes if exclude_grace is True
-    if exclude_grace:
-        for part in score:
-            grace_notes = list(part.iter_all(pt.score.GraceNote))
-            for grace_note in grace_notes:
-                part.remove(grace_note)
+    # Remove grace notes
+    for part in score:
+        grace_notes = list(part.iter_all(pt.score.GraceNote))
+        for grace_note in grace_notes:
+            part.remove(grace_note)
 
     # Create note array with necessary features
     note_array = score[0].note_array(
@@ -146,7 +145,8 @@ def predict_voice(path_to_model, path_to_score, save_path=None):
     tie_notes_over_measures(part, tied_notes)
     spt.fill_rests(part, measurewise=True)
     spt.infer_beaming(part)
-    correct_and_save_mei(part,save_path)
+    print("Saving MEI score to", save_path)
+    pt.save_mei(part,save_path)
 
 
 def predict_voice_baseline(path_to_score, save_path=None):
@@ -163,6 +163,7 @@ def predict_voice_baseline(path_to_score, save_path=None):
     spt.fill_rests(part, measurewise=True)
     spt.infer_beaming(part)
     save_path = save_path if save_path is not None else os.path.splitext(path_to_score)[0] + "_baseline_pred.mei"
+    print("Saving MEI score to", save_path)
     pt.save_mei(part, save_path)
 
 
@@ -183,30 +184,6 @@ def tie_notes_over_measures(part, tied_notes):
             dst_note.tie_prev = src_note
 
 
-def correct_and_save_mei(part,save_path):
-    # Correct the mei file reassigning voices so each staff voice start from 1
-    mei_string = pt.save_mei(part)
-    # load the mei file
-    mei = etree.fromstring(mei_string)
-    # get namespace
-    nsmap = mei.nsmap
-    nsmap['def'] = nsmap.pop(None)
-    # iterate over all measure element
-    for measure in mei.xpath("//def:measure", namespaces=nsmap):
-        # get all  layer elements inside all occurrencies of <staff n="2">
-        staff2_layers = measure.xpath("def:staff[@n='2']/def:layer", namespaces=nsmap)
-        # get the n attribute for all layers
-        staff2_layers_n = [int(layer.get("n")) for layer in staff2_layers]
-        # get the mimumum n attribute
-        min_n = min(staff2_layers_n)
-        # subtract the minimum n attribute from all layers in staff 2
-        for layer in staff2_layers:
-            layer.set("n", str(int(layer.get("n")) - min_n + 1))
-    # save the corrected mei file
-    with open(save_path, "w") as f:
-        f.write(etree.tostring(mei, pretty_print=True).decode("utf-8"))
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Predict voice assignment for a given score using a pre-trained model.")
     parser.add_argument("--model_path", type=str, default=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pretrained_models", "model.ckpt"), help="Path to the pre-trained model checkpoint.")
@@ -220,3 +197,4 @@ if __name__ == "__main__":
     save_path = args.save_path if args.save_path is not None else os.path.join(basepath, "artifacts", f"{score_name}_pred.mei")
 
     predict_voice(args.model_path, args.score_path, save_path)
+    print("Done.")
