@@ -48,6 +48,15 @@ To predict the voice assignment for a given score using a pre-trained model, you
   python launch_scripts/predict.py --model_path pretrained_models/model.ckpt --score_path artifacts/test_score.musicxml --save_path artifacts/test_score_pred.mei
 ```
 
+#### Visualization
+
+To visualize the voice assignment use our tool [MusGViz](https://github.com/fosfrancesco/musgviz/)
+
+With this tool you can visualize the input, output and ground truth of the graphs used by the model.
+Furthermore, you can also visualize the exported MEI score.
+
+
+
 ### Train your own model
 
 To train or test the voice separation model using the provided script, you can use the following command:
