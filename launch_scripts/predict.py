@@ -15,12 +15,13 @@ from piano_svsep.utils import (
     remove_ties_acros_barlines,
     get_measurewise_pot_edges,
     get_pot_chord_edges,
+    get_truth_chords_edges,
+    get_measurewise_truth_edges
     )
-from lxml import etree
 import argparse
 
 
-def prepare_score(path_to_score):
+def prepare_score(path_to_score, include_original=True):
     """
     Prepare the score for voice separation.
 
@@ -28,9 +29,9 @@ def prepare_score(path_to_score):
     ----------
     path_to_score: str
         Path to the score file. Partitura can handle different formats such as musicxml, mei, etc.
-    exclude_grace: bool
-        Whether to exclude grace notes. Defaults to True.
-
+    include_original: bool, optional
+        Whether to include the original voice and chord assignments in the graph. Defaults to True.
+        Mostly used for visualization purposes.
     Returns
     -------
         pg_graph: torch_geometric.data.HeteroData
@@ -101,6 +102,13 @@ def prepare_score(path_to_score):
     pot_chord_edges = get_pot_chord_edges(note_array, hg.get_edges_of_type("onset").numpy())
     setattr(hg, "pot_edges", torch.tensor(pot_edges))
     setattr(hg, "pot_chord_edges", torch.tensor(pot_chord_edges))
+
+    if include_original:
+        # Get truth edges, also called truth when original voice assignment is wrong.
+        truth_chords_edges = get_truth_chords_edges(note_array, pot_chord_edges)
+        polyphonic_truth_edges = get_measurewise_truth_edges(note_array, note_measures)
+        setattr(hg, "truth_chord_edges", torch.tensor(truth_chords_edges).long())
+        setattr(hg, "truth_edges", torch.tensor(polyphonic_truth_edges).long())
 
     # Convert score graph to PyG graph
     pg_graph = score_graph_to_pyg(hg)
