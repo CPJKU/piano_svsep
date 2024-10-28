@@ -1,13 +1,12 @@
 [![Python](https://img.shields.io/badge/-Python_3.8+-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![Pytorch](https://img.shields.io/badge/PyTorch_2.0+-ee4c2c?logo=pytorch&logoColor=white)](https://pytorch.org/get-started/locally/)
 [![Paper](http://img.shields.io/badge/paper-arxiv.2407.21030-B31B1B.svg)](https://arxiv.org/abs/2407.21030)
-[![Conference](http://img.shields.io/badge/ISMIR-2024-4b44ce.svg)](https://ismir2024.ismir.net/papers)
+[![Conference](http://img.shields.io/badge/ISMIR-2024-4b44ce.svg)](https://ismir2024.ismir.net/accepted-papers)
 
-**This repo is still under development, it will be finalized shortly** 
 
 # Piano Staff and Voice Separation (Piano_SVSep)
 
-Official implementation of the ISMIR 2024 paper "Cluster and Separate: A GNN Approach to Voice and Staff Prediction for Score Engraving, by Francesco Foscarin and Emmanouil Karystinaios, Eita Nakamura, and Gerhard Widmer".
+Official implementation of the ISMIR 2024 paper "Cluster and Separate: A GNN Approach to Voice and Staff Prediction for Score Engraving, by Francesco Foscarin, Emmanouil Karystinaios, Eita Nakamura, and Gerhard Widmer".
 
 _Nominated as Best Paper at ISMIR 2024!_
 
