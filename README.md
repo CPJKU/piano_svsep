@@ -3,12 +3,11 @@
 [![Paper](http://img.shields.io/badge/paper-arxiv.2407.21030-B31B1B.svg)](https://arxiv.org/abs/2407.21030)
 [![Conference](http://img.shields.io/badge/ISMIR-2024-4b44ce.svg)](https://ismir2024.ismir.net/accepted-papers)
 
+# Piano Staff and Voice Separation (Piano_SVSep)
 
 <p align="center">
-  <img src="https://miro.medium.com/v2/resize:fit:1100/format:webp/1*uHKF5_0TDX7g6JnJT-56SQ.png" alt="Description of the image">
+  <img src="https://miro.medium.com/v2/resize:fit:1100/format:webp/1*uHKF5_0TDX7g6JnJT-56SQ.png", height="300">
 </p>
-
-# Piano Staff and Voice Separation (Piano_SVSep)
 
 Official implementation of the ISMIR 2024 paper "Cluster and Separate: A GNN Approach to Voice and Staff Prediction for Score Engraving, by Francesco Foscarin, Emmanouil Karystinaios, Eita Nakamura, and Gerhard Widmer".
 
