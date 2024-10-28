@@ -29,7 +29,7 @@ def get_parser():
     parser.add_argument("--collection", type=str, choices=["musescore_pop", "dcml"], default="musescore_pop",
                         help="Collection to use")
     parser.add_argument("--model", type=str, default="SageConv", help="Block Convolution Model to use",
-                        choices=["SageConv", "MusGConv"])
+                        choices=["SageConv"])
     parser.add_argument("--use_jk", action="store_true", help="Use Jumping Knowledge")
     parser.add_argument("--tags", type=str, default="", help="Tags to add to the WandB run api")
     parser.add_argument("--homogeneous", action="store_true", help="Use homogeneous graphs")
@@ -57,48 +57,6 @@ def get_parser():
 
 
 def main():
-    """
-    Main function to train or test the voice separation model.
-
-    This function parses command-line arguments, sets up the data module, initializes the model,
-    and trains or tests the model based on the specified method.
-
-    Command-line Arguments:
-        --gpus (str): GPUs to use, for multiple separate by comma, i.e. 0,1,2. Use -1 for CPU. (Default: -1)
-        --n_layers (int): Number of layers on the Graph Convolutional Encoder Network
-        --n_hidden (int): Number of hidden units
-        --n_epochs (int): Number of epochs
-        --dropout (float): Dropout rate
-        --lr (float): Learning rate
-        --weight_decay (float): Weight decay
-        --num_workers (int): Number of workers
-        --load_from_checkpoint (bool): Load model from WANDB checkpoint
-        --linear_assignment (bool): Use linear assignment Hungarian algorithm for val and test predictions
-        --force_reload (bool): Force reload of the data
-        --collection (str): Collection to use (choices: ["musescore_pop", "dcml"])
-        --model (str): Block Convolution Model to use (choices: ["SageConv"])
-        --use_jk (bool): Use Jumping Knowledge
-        --tags (str): Tags to add to the WandB run api
-        --homogeneous (bool): Use homogeneous graphs
-        --reg_loss_type (str): Use different regularization loss
-        --batch_size (int): Batch size
-        --use_reledge (bool): Use reledge
-        --compile (bool): Compile the model
-        --use_wandb (bool): Use wandb
-        --use_metrical (bool): Use metrical graphs
-        --method (str): Method to use (choices: ["vocsep", "baseline"])
-        --pitch_embedding (int): Pitch embedding size to use
-        --subgraph_size (int): Subgraph size
-        --no_pos_weight (bool): Use pos weight
-        --chord_pooling_mode (str): Chord pooling mode (choices: ["mlp", "dot_product", "dot_product_d", "cos_similarity", "cos_similarity_d", "none"])
-        --staff_feedback (bool): Feed staff logits to the Voice prediction decoder
-        --feat_norm_scale (float): Scale factor for the feature normalization loss
-        --edge_feature_feedback (bool): Feed edge features embedding to the next layer of the encoder
-        --after_encoder_frontend (str): After encoder frontend (choices: ["true", "false"])
-
-    Raises:
-        ValueError: If the specified method is not supported.
-    """
     parser = get_parser()
 
     args = parser.parse_args()
