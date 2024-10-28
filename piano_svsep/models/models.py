@@ -163,10 +163,6 @@ class PianoSVSep(nn.Module):
         Metadata for the heterogeneous graph.
     chord_pooling_mode : str
         Pooling mode for chord prediction.
-    after_encoder_frontend : bool
-        Whether to use a linear layer after the encoder.
-    edge_feature_feedback : bool
-        Whether to use edge feature feedback.
     staff_feedback : bool
         Whether to use staff feedback.
     pooling_layer : nn.Module or None
@@ -182,17 +178,13 @@ class PianoSVSep(nn.Module):
         Initialize the weights of the model.
     """
     def __init__(self, input_features, hidden_features, num_layers, activation=F.relu, dropout=0.5,
-                conv_type="SageConv", gnn_metadata=None, chord_pooling_mode="none", after_encoder_frontend = False, **kwargs):
+                conv_type="SageConv", gnn_metadata=None, chord_pooling_mode="none", **kwargs):
         super().__init__()
-        self.edge_feature_feedback = kwargs.get("edge_feature_feedback", False)
         if conv_type == "SageConv":
             self.encoder = HSageEncoder(input_features, hidden_features, num_layers, activation, dropout, gnn_metadata)
         else:
             raise ValueError(f"Convolution type {conv_type} not supported")
-        if after_encoder_frontend:
-            self.after_encoder_frontend = nn.Linear(hidden_features, hidden_features)
-        else:
-            self.after_encoder_frontend = nn.Identity()
+        self.after_encoder_frontend = nn.Identity() # for compatibility with other experiments
         self.staff_feedback = kwargs.get("staff_feedback", False)
         self.decoder = EdgeDecoder(hidden_features, staff_feedback=self.staff_feedback)
         if chord_pooling_mode != "none":

@@ -68,10 +68,6 @@ class PLPianoSVSep(LightningModule):
         Scale for feature normalization loss, by default 0.1.
     staff_feedback : bool, optional
         Whether to use staff feedback, by default False.
-    edge_feature_feedback : bool, optional
-        Whether to use edge feature feedback, by default False.
-    after_encoder_frontend : bool, optional
-        Whether to use a frontend after the encoder, by default False.
     """
     def __init__(
             self,
@@ -88,8 +84,6 @@ class PLPianoSVSep(LightningModule):
             chord_pooling_mode="none",
             feat_norm_scale = 0.1,
             staff_feedback=False,
-            edge_feature_feedback=False,
-            after_encoder_frontend=False,
     ):
         super().__init__()
         self.save_hyperparameters()
@@ -108,7 +102,7 @@ class PLPianoSVSep(LightningModule):
         self.module = PianoSVSep(
             input_features=in_feats, hidden_features=n_hidden, num_layers=n_layers, activation=activation,
             dropout=dropout, conv_type=conv_type, gnn_metadata=self.gnn_metadata, chord_pooling_mode=chord_pooling_mode,
-            staff_feedback=staff_feedback, edge_feature_feedback=edge_feature_feedback, after_encoder_frontend=after_encoder_frontend)
+            staff_feedback=staff_feedback)
         self.rev_edges = rev_edges
         self.threshold = 0.5
         self.chord_pooling_mode = chord_pooling_mode

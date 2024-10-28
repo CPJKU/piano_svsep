@@ -24,25 +24,19 @@ def get_parser():
     parser.add_argument("--num_workers", type=int, default=10, help="Number of workers")
     parser.add_argument("--load_from_checkpoint", action="store_true", help="Load model from WANDB checkpoint")
     parser.add_argument("--linear_assignment", action="store_true",
-                        help="Use linear assignment Hungarian algorithm for val and test predictions.")
+                        help="Use linear assignment Hungarian algorithm for val and test predictions")
     parser.add_argument("--force_reload", action="store_true", help="Force reload of the data")
     parser.add_argument("--collection", type=str, choices=["musescore_pop", "dcml"], default="musescore_pop",
                         help="Collection to use")
     parser.add_argument("--model", type=str, default="SageConv", help="Block Convolution Model to use",
                         choices=["SageConv"])
-    parser.add_argument("--use_jk", action="store_true", help="Use Jumping Knowledge")
     parser.add_argument("--tags", type=str, default="", help="Tags to add to the WandB run api")
-    parser.add_argument("--homogeneous", action="store_true", help="Use homogeneous graphs")
-    parser.add_argument("--reg_loss_type", type=str, default="la", help="Use different regularization loss")
     parser.add_argument("--batch_size", type=int, default=64, help="Batch size")
-    parser.add_argument("--use_reledge", action="store_true", help="Use reledge")
     parser.add_argument("--compile", action="store_true", help="Compile the model")
     parser.add_argument("--use_wandb", action="store_true", help="Use wandb")
-    parser.add_argument("--use_metrical", action="store_true", help="Use metrical graphs")
     parser.add_argument("--method", type=str, default="vocsep", choices=["vocsep", "baseline"], help="Method to use")
-    parser.add_argument("--pitch_embedding", type=int, default=None, help="Pitch embedding size to use")
     parser.add_argument("--subgraph_size", type=int, default=1000, help="Subgraph size")
-    parser.add_argument("--no_pos_weight", action="store_true", help="Use pos weight")
+    parser.add_argument("--no_pos_weight", action="store_true", help="Disable positive weight for the loss")
     parser.add_argument("--chord_pooling_mode", type=str, default="cos_similarity",
                         choices=["mlp", "dot_product", "dot_product_d", "cos_similarity", "cos_similarity_d", "none"],
                         help="Chord pooling mode between 'mlp', 'dot_product' and 'none'")
@@ -50,9 +44,6 @@ def get_parser():
                         help="Feed staff logits to the Voice prediction decoder")
     parser.add_argument("--feat_norm_scale", type=float, default=0.1,
                         help="Scale factor for the feature normalization loss")
-    parser.add_argument("--edge_feature_feedback", action="store_true",
-                        help="Feed edge features embedding to the next layer of the encoder.")
-    parser.add_argument("--after_encoder_frontend", type=str, default="false", choices=["true", "false"], )
     return parser
 
 
@@ -91,10 +82,8 @@ def main():
         model = PLPianoSVSep(datamodule.features, args.n_hidden, args.n_layers, dropout=args.dropout,
                                                lr=args.lr, weight_decay=args.weight_decay, pos_weights=pos_weights,
                                                conv_type=args.model, chord_pooling_mode=args.chord_pooling_mode,
-                                               feat_norm_scale=args.feat_norm_scale, staff_feedback=args.staff_feedback,
-                                               edge_feature_feedback=args.edge_feature_feedback,
-                             after_encoder_frontend=args.after_encoder_frontend == "true")
-        model_name = f"{args.model}_{args.n_layers}x{args.n_hidden}-dropout={args.dropout}-lr={args.lr}-wd={args.weight_decay}-pos_weights={pos_weights['voice']},{pos_weights['chord']}-chord_pooling={args.chord_pooling_mode}-staff_feedback={args.staff_feedback}-fns={args.feat_norm_scale}-aef={args.after_encoder_frontend}"
+                                               feat_norm_scale=args.feat_norm_scale, staff_feedback=args.staff_feedback)
+        model_name = f"{args.model}_{args.n_layers}x{args.n_hidden}-dropout={args.dropout}-lr={args.lr}-wd={args.weight_decay}-pos_weights={pos_weights['voice']},{pos_weights['chord']}-chord_pooling={args.chord_pooling_mode}-staff_feedback={args.staff_feedback}-fns={args.feat_norm_scale}"
         job_type = f"{args.model}-StaffFDB={args.staff_feedback}-ChordPool={args.chord_pooling_mode}"
     elif args.method == "baseline":
         model = AlgorithmicVoiceSeparationModel()
