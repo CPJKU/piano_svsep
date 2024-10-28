@@ -1,39 +1,12 @@
 from torch.nn import functional as F
 import torch
-from piano_svsep.utils import isin_pairwise, compute_voice_f1_score, linear_assignment, infer_vocstaff_algorithm
+from piano_svsep.utils import isin_pairwise, compute_voice_f1_score, linear_assignment
 from pytorch_lightning import LightningModule
 from piano_svsep.models.models import PianoSVSep
 from piano_svsep.postprocessing import PostProcessPooling
 from piano_svsep.utils import add_reverse_edges
 from torchmetrics import F1Score, Accuracy
 import numpy as np
-
-
-class AlgorithmicVoiceSeparationModel(LightningModule):
-    """Lightning Model for running the algorithmic approach we use as baseline."""
-    def __init__(self):
-        super().__init__()
-
-    def training_step(self, batch, batch_idx, **kwargs):
-        pass
-
-    def validation_step(self, batch, batch_idx, **kwargs):
-        pass
-
-    def test_step(self, batch, batch_idx, **kwargs):
-        graph = batch[0]
-        pred_edges, pred_staff, voice_f1, staff_f1, chord_f1 = infer_vocstaff_algorithm(graph)
-        # curate nan values
-        voice_f1 = 0 if np.isnan(voice_f1) else voice_f1
-        staff_acc = 0 if np.isnan(staff_f1) else staff_f1
-        chord_f1 = 0 if np.isnan(chord_f1) else chord_f1
-        self.log("test_voice_f1", voice_f1, on_step=False, on_epoch=True, prog_bar=False, batch_size=1)
-        self.log("test_staff_acc", staff_acc, on_step=False, on_epoch=True, prog_bar=False, batch_size=1)
-        self.log("test_chord_f1", chord_f1, on_step=False, on_epoch=True, prog_bar=False, batch_size=1)
-
-    def predict_step(self, graph, **kwargs):
-        pred_edges, pred_staff = infer_vocstaff_algorithm(graph, return_score=False)
-        return pred_edges, pred_staff
 
 
 class PLPianoSVSep(LightningModule):
@@ -357,3 +330,124 @@ class PLPianoSVSep(LightningModule):
             "optimizer": optimizer,
         }
 
+
+
+class AlgorithmicVoiceSeparationModel(LightningModule):
+    """Lightning Model for running the algorithmic approach we use as baseline."""
+    def __init__(self):
+        super().__init__()
+
+    def training_step(self, batch, batch_idx, **kwargs):
+        pass
+
+    def validation_step(self, batch, batch_idx, **kwargs):
+        pass
+
+    def test_step(self, batch, batch_idx, **kwargs):
+        graph = batch[0]
+        pred_edges, pred_staff, voice_f1, staff_f1, chord_f1 = infer_vocstaff_algorithm(graph)
+        # curate nan values
+        voice_f1 = 0 if np.isnan(voice_f1) else voice_f1
+        staff_acc = 0 if np.isnan(staff_f1) else staff_f1
+        chord_f1 = 0 if np.isnan(chord_f1) else chord_f1
+        self.log("test_voice_f1", voice_f1, on_step=False, on_epoch=True, prog_bar=False, batch_size=1)
+        self.log("test_staff_acc", staff_acc, on_step=False, on_epoch=True, prog_bar=False, batch_size=1)
+        self.log("test_chord_f1", chord_f1, on_step=False, on_epoch=True, prog_bar=False, batch_size=1)
+
+    def predict_step(self, graph, **kwargs):
+        pred_edges, pred_staff = infer_vocstaff_algorithm(graph, return_score=False)
+        return pred_edges, pred_staff
+    
+
+def infer_vocstaff_algorithm(graph, return_score=True, normalize=True, return_graph=False):
+    """
+    This function infers voice and staff assignments with an algorithmic approach, instead of a neural network.
+    We use this as baseline.
+
+    Parameters:
+    ----------
+    graph : torch_geometric.data.HeteroData
+        A musical graph where each node represents a note and edges represent potential voice connections between notes.
+    return_score : (bool, optional)
+        Determines whether the function should return the F1 scores for the voice, staff, and chord predictions.
+        Default is True.
+
+    Returns:
+    ----------
+    pred_edges_voice: torch.Tensor
+        A tensor of shape (2, N) where N is the number of predicted voice edges.
+        Each column in the tensor represents an edge, with the first row being the source node and
+        the second row being the target node.
+    staff_pred: torch.Tensor
+        A tensor of the same length as the number of notes in the graph.
+        It contains the predicted staff assignment for each note.
+
+    If return_score is True, the function also returns:
+    voice_f1: float
+        The F1 score for the voice predictions.
+    staff_f1 : float
+        The F1 score for the staff predictions.
+    chord_f1 : float
+        The F1 score for the chord predictions.
+    """
+    ps_pool = PostProcessPooling(threshold=0.01)
+    edge_index_dict = graph.edge_index_dict
+    pot_edges = edge_index_dict.pop(("note", "potential", "note"))
+    pot_chord_edges = edge_index_dict.pop(("note", "chord_potential", "note"))
+    staff = graph["note"].staff.long()
+    pitches = graph["note"].pitch
+    batch = torch.zeros_like(pitches, dtype=torch.long)
+    num_nodes = len(pitches)
+    onset_beats = graph["note"].onset_beat
+    duration_beats = graph["note"].duration_beat
+    offset_beats = onset_beats + duration_beats
+    # split staffs on pitch 60
+    staff_pred = torch.zeros_like(pitches)
+    staff_pred[pitches < 60] = 1
+    # NOTE: need to trim the chord edges to keep highest.
+    pred_edges = list()
+    pred_chord_edges = list()
+    for i in range(2):
+        staff_idx = torch.where(staff_pred == i)[0]
+        staff_pot_edges = pot_edges[:, torch.isin(pot_edges[0], staff_idx) & torch.isin(pot_edges[1], staff_idx)]
+        onset_score = torch.abs(
+            onset_beats[staff_pot_edges[1]] - offset_beats[staff_pot_edges[0]])
+        pitch_score = torch.abs(pitches[staff_pot_edges[1]] - pitches[staff_pot_edges[0]])
+        # normalize the scores between 0 and 1
+        if normalize:
+            onset_score = 1 - (onset_score - onset_score.min()) / (onset_score.max() - onset_score.min() + 1e-8)
+            pitch_score = 1 - (pitch_score - pitch_score.min()) / (pitch_score.max() - pitch_score.min() + 1e-8)
+        staff_pot_score = onset_score * pitch_score
+        staff_pot_chord_edges = pot_chord_edges[:, torch.isin(pot_chord_edges[0], staff_idx) & torch.isin(pot_chord_edges[1], staff_idx)]
+        staff_pot_chord_score = torch.ones(staff_pot_chord_edges.shape[1])
+        new_edge_index, new_edge_probs, unpool_info, reduced_num_nodes = ps_pool(
+            staff_pot_edges, staff_pot_score, staff_pot_chord_edges, staff_pot_chord_score, batch, num_nodes)
+        post_monophonic_edges = linear_assignment(new_edge_probs, new_edge_index, reduced_num_nodes, threshold=0.01)
+        post_pred_edges = ps_pool.unpool(post_monophonic_edges, reduced_num_nodes, unpool_info)
+        pred_edges.append(post_pred_edges)
+        pred_chord_edges.append(staff_pot_chord_edges)
+
+    pred_chord_edges = torch.cat(pred_chord_edges, dim=-1)
+    pred_edges_voice = torch.cat(pred_edges, dim=-1)
+
+    if return_score:
+        # sort the predicted chord edges
+        pred_chord_edges = pred_chord_edges[:, torch.argsort(pred_chord_edges[0])]
+        truth_edges = edge_index_dict.pop(("note", "truth", "note"))
+        voice_f1 = compute_voice_f1_score(pred_edges_voice, truth_edges, num_nodes).item()
+        truth_chord_edges = edge_index_dict.pop(("note", "chord_truth", "note"))
+        staff_metric = Accuracy(task="multiclass", num_classes=2).to(pred_edges_voice.device)
+        staff_acc = staff_metric(staff_pred, staff).item()
+        chord_f1 = compute_voice_f1_score(pred_chord_edges, truth_chord_edges, num_nodes).item()
+        return pred_edges_voice, staff_pred, voice_f1, staff_acc, chord_f1
+    # add the chord edges to the pred_edges_voice
+    pred_edges_voice = torch.cat((pred_edges_voice, pred_chord_edges), dim=-1)
+    # sort the predicted voice edges
+    pred_edges_voice = pred_edges_voice[:, torch.argsort(pred_edges_voice[0])]
+    if return_graph:
+        graph["note", "chord_potential", "note"].edge_index = pot_chord_edges
+        graph["note", "potential", "note"].edge_index = pot_edges
+        graph["note", "chord_predicted", "note"].edge_index = pred_chord_edges
+        graph["note", "predicted", "note"].edge_index = pred_edges_voice
+        return pred_edges_voice, staff_pred, graph
+    return pred_edges_voice, staff_pred
