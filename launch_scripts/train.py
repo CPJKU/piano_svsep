@@ -76,7 +76,7 @@ def main():
         --linear_assignment (bool): Use linear assignment Hungarian algorithm for val and test predictions
         --force_reload (bool): Force reload of the data
         --collection (str): Collection to use (choices: ["musescore_pop", "dcml"])
-        --model (str): Block Convolution Model to use (choices: ["SageConv", "MusGConv"])
+        --model (str): Block Convolution Model to use (choices: ["SageConv"])
         --use_jk (bool): Use Jumping Knowledge
         --tags (str): Tags to add to the WandB run api
         --homogeneous (bool): Use homogeneous graphs
