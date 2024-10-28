@@ -10,6 +10,7 @@ import numpy as np
 
 
 class AlgorithmicVoiceSeparationModel(LightningModule):
+    """Lightning Model for running the algorithmic approach we use as baseline."""
     def __init__(self):
         super().__init__()
 
