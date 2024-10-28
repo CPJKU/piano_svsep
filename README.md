@@ -7,7 +7,7 @@
 
 # Piano Staff and Voice Separation (Piano_SVSep)
 
-Code for the paper "Cluster and Separate: A GNN Approach to Voice and Staff Prediction for Score Engraving".
+Code for the paper "Cluster and Separate: A GNN Approach to Voice and Staff Prediction for Score Engraving, by Francesco Foscarin and Emmanouil Karystinaios, Eita Nakamura, and Gerhard Widmer, at ISMIR 2014".
 
 _Nominated as Best Paper at ISMIR 2024!_
 
