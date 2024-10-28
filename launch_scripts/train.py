@@ -2,7 +2,7 @@ import torch
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 from piano_svsep.models.pl_models import PLPianoSVSep, AlgorithmicVoiceSeparationModel
-from piano_svsep.data.mix_vs import GraphPolyphonicVoiceSeparationDataModule
+from piano_svsep.data.pl_dataset import GraphPolyphonicVoiceSeparationDataModule
 import argparse
 from pytorch_lightning import Trainer, seed_everything
 
@@ -26,7 +26,13 @@ def get_parser():
     parser.add_argument("--linear_assignment", action="store_true",
                         help="Use linear assignment Hungarian algorithm for val and test predictions")
     parser.add_argument("--force_reload", action="store_true", help="Force reload of the data")
-    parser.add_argument("--collection", type=str, choices=["musescore_pop", "dcml"], default="musescore_pop",
+    parser.add_argument("--train_datasets", action="store",
+        nargs="*",
+        type=str,
+        default=["dcml"],
+        help="Which datasets to use for training among dcml, and jpop. The paper model was tranined with both datasets, but the default is not set to only dcml, since jpop is not publicly available.",
+    ),
+    parser.add_argument("--test_dataset", type=str, choices=["jpop", "dcml"], default="dcml",
                         help="Collection to use")
     parser.add_argument("--model", type=str, default="SageConv", help="Block Convolution Model to use",
                         choices=["SageConv"])
@@ -56,16 +62,14 @@ def main():
     if args.gpus == "-1":
         devices = 1
         accelerator = "cpu"
-        use_ddp = False
     else:
         devices = [eval(gpu) for gpu in args.gpus.split(",")]
         accelerator = "auto"
-        use_ddp = len(devices) > 1
 
     # Initialize the data module
     datamodule = GraphPolyphonicVoiceSeparationDataModule(batch_size=args.batch_size, subgraph_size=args.subgraph_size,
                                                           num_workers=args.num_workers, force_reload=args.force_reload,
-                                                          test_collections=args.collection)
+                                                          test_dataset=args.test_dataset, train_datasets=args.train_datasets)
     datamodule.setup()
 
     # Set positive weights for the loss function if not disabled
@@ -101,7 +105,7 @@ def main():
         wandb_logger = WandbLogger(
             project="Polyphonic-Voice-Separation",
             entity="vocsep",
-            group=f"{args.collection}",
+            group=f"{args.test_dataset}",
             job_type=job_type,
             name=model_name,
             tags=args.tags.split(",") if args.tags != "" else None,

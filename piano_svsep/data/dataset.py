@@ -582,6 +582,11 @@ class DCMLPianoCorporaDataset(BuiltinDataset):
     """
     def __init__(self, raw_dir=None, force_reload=False, verbose=True):
         url = "https://github.com/fosfrancesco/piano_corpora_dcml.git"
+        self.scores = []
+        self.collections = []
+        self.composers = []
+        self.period = "Unknown"
+        self.type = []
         super(DCMLPianoCorporaDataset, self).__init__(
             name="DCMLPianoCorporaDataset",
             url=url,
@@ -589,19 +594,17 @@ class DCMLPianoCorporaDataset(BuiltinDataset):
             force_reload=force_reload,
             verbose=verbose,
             is_zip=False)
-        self.scores = []
-        self.collections = []
-        self.composers = []
-        self.period = "Unknown"
-        self.type = []
         self.process()
 
     def process(self):
         """
         Process the dataset by loading scores and collections.
         """
+        # reinitialize the lists as a safeguard in case of multiple calls to process
         self.scores = []
         self.collections = []
+        self.composers = []
+        self.type = []
         for fn in os.listdir(os.path.join(self.save_path, "scores")):
             for score_fn in os.listdir(os.path.join(self.save_path, "scores", fn)):
                 if score_fn.endswith(".musicxml"):
@@ -743,7 +746,7 @@ class DCMLPianoCorporaPolyVoiceSeparationDataset(GraphPolyphonicVoiceSeparationD
 
 
 
-class MusescorePopPolyVoiceSeparationDataset(GraphPolyphonicVoiceSeparationDataset):
+class MusescoreJPopPolyVoiceSeparationDataset(GraphPolyphonicVoiceSeparationDataset):
     """
     A dataset class for polyphonic voice separation using the Musescore Pop dataset.
 
@@ -763,7 +766,7 @@ class MusescorePopPolyVoiceSeparationDataset(GraphPolyphonicVoiceSeparationDatas
     def __init__(self, raw_dir=None, force_reload=False, verbose=True, nprocs=4, max_size=5000):
         dataset_base = MusescoreJPopDataset(raw_dir=raw_dir, force_reload=force_reload, verbose=verbose)
         prob_pieces = ['0858', '0749', '0634', '0654', '0362', '0409', '0517', '0461', '0404', '0850', '0339', '0595', '0822', '0471', '0431', '0643']
-        super(MusescorePopPolyVoiceSeparationDataset, self).__init__(dataset_base=dataset_base, force_reload=force_reload, nprocs=nprocs, max_size=max_size, prob_pieces=prob_pieces)
+        super(MusescoreJPopPolyVoiceSeparationDataset, self).__init__(dataset_base=dataset_base, force_reload=force_reload, nprocs=nprocs, max_size=max_size, prob_pieces=prob_pieces)
         # display some data on the number of pieces that was discarded
         print("MusescorePopPolyVoiceSeparationDataset loaded.")
         print(f"Available pieces: {len(self.graphs)} from the original {len(self.dataset_base.scores)} scores")
