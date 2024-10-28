@@ -624,9 +624,10 @@ class DCMLPianoCorporaDataset(BuiltinDataset):
         return False
 
 
-class MusescorePopDataset(BuiltinDataset):
+class MusescoreJPopDataset(BuiltinDataset):
     """
-    A dataset class for the Musescore Pop dataset.
+    A dataset class for the Musescore J-Pop dataset.
+    This dataset is not publicly available. The code here is therefore only for reference.
 
     Parameters
     ----------
@@ -639,10 +640,9 @@ class MusescorePopDataset(BuiltinDataset):
     """
     def __init__(self, raw_dir=None, force_reload=False, verbose=True):
         url = ""
-        raise NotImplementedError("The MusescorePopDataset is private and not available for download. "
-                                  "Please contact the authors for access.")
-        super(MusescorePopDataset, self).__init__(
-            name="MusescorePopDataset",
+        raise NotImplementedError("The MusescoreJPopDataset is unfortunately not publicly available.")
+        super(MusescoreJPopDataset, self).__init__(
+            name="MusescoreJPopDataset",
             url=url,
             raw_dir=raw_dir,
             force_reload=force_reload,
@@ -737,7 +737,7 @@ class DCMLPianoCorporaPolyVoiceSeparationDataset(GraphPolyphonicVoiceSeparationD
             'beethoven_piano_sonatas_07-3', 'dvorak_silhouettes_op08n05', 'chopin_mazurkas_BI60-2op06-2',
             'grieg_lyric_pieces_op38n02', 'debussy_corpus_l136-06_etudes_huit']
         self.test_files = [f"dcml_{piece}" for piece in self.test_files]
-        # Excluded from tests due to exceptional cases
+        # Excluded from tests due to problematic cases
         # ['liszt_pelerinage_162.01_Gondoliera', 'debussy_corpus_l095-01_pour_prelude', 'debussy_corpus_l100-03_estampes_jardins']
         print(discarded)
 
@@ -761,7 +761,7 @@ class MusescorePopPolyVoiceSeparationDataset(GraphPolyphonicVoiceSeparationDatas
         Maximum size of the dataset (default is 5000).
     """
     def __init__(self, raw_dir=None, force_reload=False, verbose=True, nprocs=4, max_size=5000):
-        dataset_base = MusescorePopDataset(raw_dir=raw_dir, force_reload=force_reload, verbose=verbose)
+        dataset_base = MusescoreJPopDataset(raw_dir=raw_dir, force_reload=force_reload, verbose=verbose)
         prob_pieces = ['0858', '0749', '0634', '0654', '0362', '0409', '0517', '0461', '0404', '0850', '0339', '0595', '0822', '0471', '0431', '0643']
         super(MusescorePopPolyVoiceSeparationDataset, self).__init__(dataset_base=dataset_base, force_reload=force_reload, nprocs=nprocs, max_size=max_size, prob_pieces=prob_pieces)
         # display some data on the number of pieces that was discarded
