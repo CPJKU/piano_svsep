@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 try:
     import torch
 except ImportError:
-    raise ImportError("Pytorch is not installed. Please install it using 'pip install torch'")
+    raise ImportError("Pytorch is not installed. Please install it using the proper configurations for your system https://pytorch.org/get-started/locally/")
 
 
 setup(
