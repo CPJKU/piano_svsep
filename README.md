@@ -29,8 +29,9 @@ Then clone the repo:
   cd piano_svsep
 ```
 
-To install using pip simply navigate to the root of the project and run:
+Finally navigate to the root of the project and install:
 ```shell
+  cd piano_svsep
   pip install .
 ```
 
