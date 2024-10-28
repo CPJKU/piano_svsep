@@ -4,8 +4,7 @@ import partitura.score as spt
 import numpy as np
 import torch
 import torch_geometric as pyg
-from piano_svsep.models.pl_models import PLPianoSVSep
-from piano_svsep.utils import assign_voices, infer_vocstaff_algorithm
+from piano_svsep.models.pl_models import PLPianoSVSep, infer_vocstaff_algorithm
 from piano_svsep.utils.visualization import save_pyg_graph_as_json
 from piano_svsep.utils import (
     hetero_graph_from_note_array,
@@ -16,7 +15,8 @@ from piano_svsep.utils import (
     get_measurewise_pot_edges,
     get_pot_chord_edges,
     get_truth_chords_edges,
-    get_measurewise_truth_edges
+    get_measurewise_truth_edges,
+    assign_voices
     )
 import argparse
 
