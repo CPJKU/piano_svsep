@@ -26,7 +26,6 @@ You can find the instructions [here](https://pytorch.org/get-started/locally/).
 Then clone the repo:
 ```shell
   git clone https://github.com/cpjku/piano_svsep.git
-  cd piano_svsep
 ```
 
 Finally navigate to the root of the project and install:
@@ -54,14 +53,6 @@ You can try it out on the example score we provide.
 ```
 This uses the pretrained model we use for the evaluation in our paper.
 
-#### Visualization
-
-We provide the [MusGViz](https://github.com/fosfrancesco/musgviz/) tool for visualization, to directly inspect the input, output, and ground truth graphs.
- 
-Visit the repo and follow the instructions there. You can load the example files in `artifacts/` or produce new files.
-
-
-
 ### Train your own model
 
 Unfortunately, the `jpop` dataset we used in our paper is not public, therefore the results of the paper are not entirely reproducible.
@@ -80,6 +71,12 @@ The default parameters (excluding the `train_dataset` parameter) are the ones we
 ```bash
 python launch_scripts/train.py --help
 ```
+
+### Visualization
+
+We provide the [MusGViz](https://github.com/fosfrancesco/musgviz/) tool for visualization, to directly inspect the input, output, and ground truth graphs.
+ 
+Visit the repo and follow the instructions there. You can load the example files in `artifacts/` or produce new files.
 
 
 ## Cite Us
