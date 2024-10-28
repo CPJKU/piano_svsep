@@ -372,7 +372,8 @@ class EdgeDecoder(torch.nn.Module):
 
     def pitch_score(self, edge_index, mpitch):
         """
-        Calculate the pitch score from MIDI to frequency.
+        Calculate the pitch score, i.e., a number from 0 to 1 measuring the distance 
+        between two pitches. The smaller the number, the smaller the pitch distance.
         Pairs of notes with similar pitches are more likely to be connected.
 
         Parameters
@@ -392,8 +393,12 @@ class EdgeDecoder(torch.nn.Module):
 
     def onset_score(self, edge_index, onset, duration, onset_beat, duration_beat, ts_beats):
         """
-        Calculate the onset score between notes.
-        Pairs of notes with similar onset times are more likely to be connected.
+        Calculate the onset score between notes, i.e., a measure of distance between the 
+        previous note offset and the nect note onset.
+        For each pair of notes, two scores are computed: a continous score between 0 and 1,
+        and a binary score, telling if the next note is starting exactly when the previous note ends.
+
+        Pairs of notes with closer onset times are more likely to be connected.
 
         Parameters
         ----------
@@ -415,12 +420,12 @@ class EdgeDecoder(torch.nn.Module):
         Tensor
             Onset scores.
         """
-        offset = onset + duration
         offset_beat = onset_beat + duration_beat
         note_distance_beat = onset_beat[edge_index[1]] - offset_beat[edge_index[0]]
         ts_beats_edges = ts_beats[edge_index[1]]
-        # oscore = 1- (1/(1+torch.exp(-2*(note_distance_beat/ts_beats_edges)))-0.5)*2
-        oscore = 1 - torch.tanh(note_distance_beat / ts_beats_edges)
-        one_hot_pitch_score = (onset[edge_index[1]] == offset[edge_index[0]]).float()
-        oscore = torch.cat((oscore.unsqueeze(1), one_hot_pitch_score.unsqueeze(1)), dim=1)
+        continuous_oscore = 1 - torch.tanh(note_distance_beat / ts_beats_edges)
+
+        offset = onset + duration
+        binary_oscore = (onset[edge_index[1]] == offset[edge_index[0]]).float()
+        oscore = torch.vstack((continuous_oscore,binary_oscore)).T
         return oscore
