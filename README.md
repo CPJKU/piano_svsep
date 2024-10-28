@@ -9,7 +9,7 @@
 
 Code for the paper "Cluster and Separate: A GNN Approach to Voice and Staff Prediction for Score Engraving".
 
-_Nominated as Best Paper at ISMIR 2024!!!_
+_Nominated as Best Paper at ISMIR 2024!_
 
 Read the full paper [here](https://arxiv.org/abs/2407.21030)
 
@@ -36,47 +36,47 @@ To install using pip simply navigate to the root of the project and run:
 
 ### Prediction
 
-To predict the voices and staves of a MIDI or musicXML file you can use the following command:
+Our system is supposed to be be run in the final stage of a transcription or generation process, where a musical score is *almost* ready, but it is still missing voice and staff information.
+
+The best way to simulate such a situation is to input a musical score (with potentially random voice and staff assignments). The system will then return the same musical score with newly produced voice and staff information.
+
+For this, you can use the following command:
 ```shell
-  python launch_scripts/predict.py --input_score path/to/midi --output_path path/to/output
+  python launch_scripts/predict.py --model_path path/to/model  --input_score path/to/input_score --output_path path/to/output_score
 ```
 
-#### Example
-
-To predict the voice assignment for a given score using a pre-trained model, you can use the following command:
+You can try it out on the example score we provide.
 ```shell
   python launch_scripts/predict.py --model_path pretrained_models/model.ckpt --score_path artifacts/test_score.musicxml --save_path artifacts/test_score_pred.mei
 ```
+This uses the pretrained model we use the evaluation in our paper.
 
 #### Visualization
 
-To visualize the voice assignment use our tool [MusGViz](https://github.com/fosfrancesco/musgviz/)
-
-With this tool you can visualize the input, output and ground truth of the graphs used by the model.
-Furthermore, you can also visualize the exported MEI score.
+We provide the [MusGViz](https://github.com/fosfrancesco/musgviz/) tool for visualization, to directly inspect the input, output and ground truth graphs.
+ 
+Visit the repo and follow the instructions there. You can load the examples files in `artifacts/` or produce new files.
 
 
 
 ### Train your own model
 
-To train or test the voice separation model using the provided script, you can use the following command:
+Unfortunately the `jpop` dataset we used in our paper is not public, therefore the results of the paper are not entirely reproducible.
+We still make all the code available, including the code to handle the jpop dataset in case you should obtain access to it.
+
+We also changed the default parameters in our training script, in order to train only with the `dcml` dataset.
+Specifically, the `train_datasets` parameter is not set to `dcml` only, while in the paper we uses both `dcml` and `jpop` dataset.
+is now set to `dcml` only.
+To train, you can use the following command:
 
 ```bash
-python launch_scripts/train.py --gpus 0 --n_layers 3 --n_hidden 128 --n_epochs 50 --dropout 0.3 --lr 0.0005 --weight_decay 0.0001 --num_workers 8 --collection musescore_pop --model SageConv --batch_size 32 --method vocsep --use_wandb --tags "experiment1,voice_separation"
+python launch_scripts/train.py 
 ```
 
-This command will:
-- Use GPU 0 for training.
-- Set the number of layers to 3 and the number of hidden units to 128.
-- Train the model for 50 epochs with a dropout rate of 0.3.
-- Use a learning rate of 0.0005 and a weight decay of 0.0001.
-- Use 8 workers for data loading.
-- Use the `musescore_pop` collection and the `SageConv` model.
-- Set the batch size to 32.
-- Use the `vocsep` method for training.
-- Enable logging with WandB and add the tags "experiment1" and "voice_separation".
-
-For more details on the available command-line arguments, refer to the script's documentation.
+The default parameters (excluding the `train_dataset` parameter) are the ones we used in the paper, and can be inspected with
+```bash
+python launch_scripts/train.py --help
+```
 
 
 ## Cite Us
