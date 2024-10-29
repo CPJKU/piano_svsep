@@ -44,7 +44,7 @@ The best way to simulate such a situation is to input a musical score (with pote
 
 For this, you can use the following command:
 ```shell
-  python launch_scripts/predict.py --model_path path/to/model  --input_score path/to/input_score --output_path path/to/output_score
+  python launch_scripts/predict.py --model_path path/to/model  --score_path path/to/input_score --save_path path/to/output_score
 ```
 
 You can try it out on the example score we provide.
