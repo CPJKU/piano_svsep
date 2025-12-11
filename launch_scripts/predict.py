@@ -135,7 +135,7 @@ def predict_voice(path_to_model, path_to_score, save_path=None):
         Updates are made to the score object and saved to the specified path.
     """
     # Load the model
-    pl_model = PLPianoSVSep.load_from_checkpoint(path_to_model, map_location="cpu")
+    pl_model = PLPianoSVSep.load_from_checkpoint(path_to_model, map_location="cpu", strict=False, weights_only=False)
     # Prepare the score
     pg_graph, score, tied_notes = prepare_score(path_to_score)
     # Batch for compatibility
@@ -154,7 +154,13 @@ def predict_voice(path_to_model, path_to_score, save_path=None):
     spt.fill_rests(part, measurewise=True)
     spt.infer_beaming(part)
     print("Saving MEI score to", save_path)
-    pt.save_mei(part,save_path)
+    if save_path.endswith(".mei"):
+        pt.save_mei(part,save_path)
+    elif save_path.endswith(".musicxml") or save_path.endswith(".xml"):
+        pt.save_musicxml(part, save_path)
+    else:
+        raise ValueError("Unsupported file format. Please use .mei or .musicxml/.xml")
+
 
 
 def predict_voice_baseline(path_to_score, save_path=None):

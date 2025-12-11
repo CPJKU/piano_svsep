@@ -1,11 +1,16 @@
+--index-url https://download.pytorch.org/whl/cu128
+--extra-index-url https://pypi.org/simple
+--find-links https://data.pyg.org/whl/torch-2.8.0+cu128.html
+torch==2.8.0
 torch_geometric
-partitura==1.5.0
-torchmetrics==1.4.0
+partitura==1.7.0
+torchmetrics
 scipy
-pytorch_lightning==2.3.3
+pytorch_lightning
 verovio==4.2.1
-torch-scatter==2.1.2
-joblib==1.0.1
-gitpython==3.1.14
-tqdm==4.61.0
-scikit-learn
+torch-scatter
+joblib
+gitpython
+tqdm
+scikit-learn==1.6.0
+gradio

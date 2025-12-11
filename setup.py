@@ -1,27 +1,28 @@
 from setuptools import setup, find_packages
 
-try:
-    import torch
-except ImportError:
-    raise ImportError("Pytorch is not installed. Please install it using the proper configurations for your system https://pytorch.org/get-started/locally/")
+# try:
+#     import torch
+# except ImportError:
+#     raise ImportError("Pytorch is not installed. Please install it using the proper configurations for your system https://pytorch.org/get-started/locally/")
 
 
 setup(
     name="piano_svsep",
     version="0.0.1dev",
     packages=find_packages(),
-    setup_requires=["torch"],
+    setup_requires=["torch==2.7.0"],
     install_requires=[
+        "torch==2.8.0",
         "torch_geometric",
-        "partitura==1.5.0",
-        "torchmetrics==1.4.0",
+        "partitura==1.7.0",
+        "torchmetrics",
         "scipy",
-        "scikit-learn",
-        "pytorch_lightning==2.3.3",
-        "verovio==4.2.1",
-        "torch-scatter==2.1.2",
-        "joblib==1.0.1",
-        "gitpython==3.1.14",
-        "tqdm==4.61.0",
+        "scikit-learn==1.6.0",
+        "pytorch_lightning",
+        "verovio",
+        "torch-scatter",
+        "joblib",
+        "gitpython",
+        "tqdm",
     ],
 )
