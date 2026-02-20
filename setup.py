@@ -14,7 +14,7 @@ setup(
     install_requires=[
         "torch==2.8.0",
         "torch_geometric",
-        "partitura==1.7.0",
+        "partitura==1.8.0",
         "torchmetrics",
         "scipy",
         "scikit-learn==1.6.0",
