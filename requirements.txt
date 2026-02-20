@@ -3,7 +3,7 @@
 --find-links https://data.pyg.org/whl/torch-2.8.0+cu128.html
 torch==2.8.0
 torch_geometric
-partitura==1.7.0
+partitura==1.8.0
 torchmetrics
 scipy
 pytorch_lightning
