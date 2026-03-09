@@ -3,6 +3,7 @@ import numpy as np
 import scipy as sp
 import partitura
 import torch_geometric as pyg
+import re
 from typing import Tuple, List
 import partitura as pt
 from torch_scatter import scatter_add
@@ -175,9 +176,20 @@ def get_measurewise_pot_edges(note_array, measure_notes):
 def sanitize_staff_voices(note_array):
     # case when there are two parts, and each one have only one staff.
     if len(np.unique(note_array["staff"])) == 1:
-        # id is in the form "P01_something", extract the number before the underscore and after P
-        staff_from_id = np.char.partition(np.char.partition(note_array["id"], sep="_")[:, 0], sep="P")[:, 2].astype(int)
-        note_array["staff"] = staff_from_id + 1  # staff is 1-indexed
+        # infer staff from ids only when all prefixes look like P<number>.
+        # Example: "P01_xxx" -> part index 1 -> staff 2 (then re-normalized below).
+        part_tokens = np.char.partition(note_array["id"].astype(str), sep="_")[:, 0]
+        parsed_part_ids = np.full(len(part_tokens), -1, dtype=int)
+        for i, token in enumerate(part_tokens):
+            match = re.match(r"^P(\d+)", token)
+            if match is not None:
+                parsed_part_ids[i] = int(match.group(1))
+        if np.all(parsed_part_ids >= 0):
+            note_array["staff"] = parsed_part_ids + 1  # staff is 1-indexed
+        else:
+            # some inputs (e.g., force_note_ids: n0, n1, ...) do not encode part ids.
+            # keep the existing staff values and avoid crashing.
+            pass
     # check if only two staves exist
     # if len(np.unique(note_array["staff"])) != 2:
     #     raise Exception("After sanitizing, the score has", len(np.unique(note_array["staff"])),
@@ -545,4 +557,3 @@ def isin_pairwise(element, test_elements, assume_unique=True):
     element_cantor_proj = cantor_pairing(element[0], element[1])
     test_elements_cantor_proj = cantor_pairing(test_elements[0], test_elements[1])
     return torch.isin(element_cantor_proj, test_elements_cantor_proj, assume_unique=assume_unique)
-

@@ -116,7 +116,7 @@ def prepare_score(path_to_score, include_original=True):
     return pg_graph, score, tie_couples
 
 
-def predict_voice(path_to_model, path_to_score, save_path=None):
+def predict_voice(path_to_model, path_to_score, save_path=None, save_graph_json=False):
     """
     Predict the voice assignment for a given score using a pre-trained model.
 
@@ -148,7 +148,8 @@ def predict_voice(path_to_model, path_to_score, save_path=None):
     part = score[0]
     save_path = save_path if save_path is not None else os.path.splitext(path_to_score)[0] + "_pred.mei"
     pg_graph.name = os.path.splitext(os.path.basename(save_path))[0]
-    save_pyg_graph_as_json(pg_graph, ids=part.note_array()["id"], path=os.path.dirname(save_path))
+    if save_graph_json:
+        save_pyg_graph_as_json(pg_graph, ids=part.note_array()["id"], path=os.path.dirname(save_path))
     assign_voices(part, pred_voices, pred_staff)
     tie_notes_over_measures(part, tied_notes)
     spt.fill_rests(part, measurewise=True)
