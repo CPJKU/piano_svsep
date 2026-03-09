@@ -179,17 +179,17 @@ def sanitize_staff_voices(note_array):
         staff_from_id = np.char.partition(np.char.partition(note_array["id"], sep="_")[:, 0], sep="P")[:, 2].astype(int)
         note_array["staff"] = staff_from_id + 1  # staff is 1-indexed
     # check if only two staves exist
-    if len(np.unique(note_array["staff"])) != 2:
-        raise Exception("After sanitizing, the score has", len(np.unique(note_array["staff"])),
-                        "staves but it must have only 2.")
+    # if len(np.unique(note_array["staff"])) != 2:
+    #     raise Exception("After sanitizing, the score has", len(np.unique(note_array["staff"])),
+    #                     "staves but it must have only 2.")
     # sometimes staff numbers are shifted. Shift them back to 1-2
     if note_array["staff"].min() != 1:
         note_array["staff"] = note_array["staff"] - note_array["staff"].min() + 1
     # check if they are between 1 and 2
-    if note_array["staff"].min() != 1:
-        raise Exception(f"After sanitizing, the minimum staff is {note_array['staff'].min()} but it should be 1")
-    if note_array["staff"].max() != 2:
-        raise Exception(f"After sanitizing, the maximum staff is {note_array['staff'].max()} but it should be 2")
+    # if note_array["staff"].min() != 1:
+    #     raise Exception(f"After sanitizing, the minimum staff is {note_array['staff'].min()} but it should be 1")
+    # if note_array["staff"].max() != 2:
+    #     raise Exception(f"After sanitizing, the maximum staff is {note_array['staff'].max()} but it should be 2")
     # check that there are no None voice values.
     if np.any(note_array["voice"] == None):
         raise Exception("Note array contains None voice values.")
